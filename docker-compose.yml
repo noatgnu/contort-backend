@@ -1,0 +1,31 @@
+# a docker-compose file with a postgres 14 service
+
+version: '3.8'
+services:
+  dbct:
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+    - 5432:5432
+    volumes:
+    - ./data:/var/lib/postgresql/data
+    networks:
+        - ta-net
+  redisct:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-redis
+    restart: always
+    environment:
+      - REDIS_PASSWORD=redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ta-net
+
+networks:
+    ta-net:
