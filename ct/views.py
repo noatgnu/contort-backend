@@ -31,3 +31,10 @@ def consurf_msa_variation(request, uniprot_accession: str):
     df = utils.read_consurf_msa_variation_file(consurf.consurf_msa_variation.path)
     df.fillna("", inplace=True)
     return df.to_dict(orient="records")
+
+@api.get("/consurf/typeahead/{uniprot_accession}", response=list[str])
+def consurf_typeahead(request, uniprot_accession: str):
+    if uniprot_accession == "":
+        return []
+    consurf = CONSURFModel.objects.filter(uniprot_accession__icontains=uniprot_accession).order_by("uniprot_accession")[:10]
+    return [i.uniprot_accession for i in consurf]

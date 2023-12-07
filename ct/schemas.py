@@ -20,7 +20,7 @@ class CONSURFGrade(Schema):
     COLOR: str
     CONFIDENCE_INTERVAL: list[float]
     CONFIDENCE_INTERVAL_COLORS: list[str]
-    MSA_DATA: str
+    MSA_DATA: list[int]
     RESIDUE_VARIETY: list[str]
     BE: str
     FUNCTION: str

@@ -60,6 +60,8 @@ def read_consurf_grade_file(file_path: str) -> pd.DataFrame:
                             row["CONFIDENCE_INTERVAL_COLORS"] = (d[0].strip(), d[1].strip())
                         elif currentColumn == "RESIDUE_VARIETY":
                             row[currentColumn] = match.group(0).replace(" ", "").split(",")
+                        elif currentColumn == "MSA_DATA":
+                            row[currentColumn] = [int(i) for i in match.group(0).split("/") if i != ""]
                         elif currentColumn == "B/E":
                             row["BE"] = match.group(0).strip()
                         else:
@@ -82,6 +84,9 @@ def read_consurf_msa_variation_file(file_path: str) -> pd.DataFrame:
         "pos", "A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y", "OTHER", "MAX AA", "ConSurf Grade"
         ]
     df = pd.read_csv(file_path, skiprows=5, names=column_names)
+    for c in column_names:
+        if c not in ("pos", "MAX AA", "ConSurf Grade"):
+            df[c] = df[c].fillna(0)
     df["ConSurf Grade"] = df["ConSurf Grade"].astype(str)
     df.rename(columns={"ConSurf Grade": "ConSurf_Grade", "MAX AA": "MAX_AA"}, inplace=True)
     return df
