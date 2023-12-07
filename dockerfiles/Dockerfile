@@ -9,6 +9,7 @@ RUN apt-get update
 RUN apt-get -y install postgresql-client-14
 WORKDIR /app
 RUN mkdir "/app/media"
+RUN mkdir "/app/staticfiles"
 RUN mkdir "/app/backup"
 COPY . /app/
 
