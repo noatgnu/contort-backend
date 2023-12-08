@@ -7,13 +7,15 @@ from ninja.files import UploadedFile
 # Create your views here.
 
 api = NinjaAPI(docs=Swagger())
+from ninja.security import django_auth, django_auth_superuser
+
 
 @api.get("/consurf/{uniprot_accession}", response=CONSURFModelSchema)
 def consurf(request, uniprot_accession: str):
     consurf = CONSURFModel.objects.get(uniprot_accession=uniprot_accession)
     return consurf
 
-@api.post("/consurf", response=CONSURFModelSchema)
+@api.post("/consurf", response=CONSURFModelSchema, auth=django_auth_superuser)
 def create_consurf(request, uniprot_accession: Form[str], consurf_grade: UploadedFile, consurf_msa_variation: UploadedFile):
     consurf = CONSURFModel.objects.create(uniprot_accession=uniprot_accession, consurf_grade=consurf_grade, consurf_msa_variation=consurf_msa_variation)
     return consurf
