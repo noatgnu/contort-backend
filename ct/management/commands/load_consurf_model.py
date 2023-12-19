@@ -34,4 +34,6 @@ class Command(BaseCommand):
                     consurf.consurf_grade.save("consurf_grades.txt", File(open(consurf_grade, "rb")))
                     consurf.consurf_msa_variation.save("msa_aa_variety_percentage.csv",
                                                        File(open(consurf_msa_variation, "rb")))
+                    consurf.msa.save("input_msa.phy", File(open(os.path.join(root, dir, "input_msa.phy"), "rb")))
                     consurf.save()
+

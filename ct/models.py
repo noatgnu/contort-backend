@@ -11,7 +11,8 @@ class CONSURFModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     consurf_grade = models.FileField(upload_to="consurf_grade", blank=True, null=True)
-    consurf_msa_variation = models.FileField(upload_to="consurf_msa_variantion", blank=True, null=True)
+    consurf_msa_variation = models.FileField(upload_to="consurf_msa_variation", blank=True, null=True)
+    msa = models.FileField(upload_to="msa", blank=True, null=True)
 
     class Meta:
         ordering = ["id"]
