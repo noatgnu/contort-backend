@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'ct.apps.CtConfig',
-    'dbbackup'
+    'dbbackup',
+    'django_sendfile'
 ]
 
 MIDDLEWARE = [
@@ -142,6 +143,9 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
+SENDFILE_BACKEND = 'django_sendfile.backends.simple'
+SENDFILE_ROOT = MEDIA_ROOT
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

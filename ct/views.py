@@ -1,3 +1,4 @@
+from django_sendfile import sendfile
 from ninja import NinjaAPI, Form, Swagger
 
 from ct import utils
@@ -40,3 +41,8 @@ def consurf_typeahead(request, uniprot_accession: str):
         return []
     consurf = CONSURFModel.objects.filter(uniprot_accession__icontains=uniprot_accession).order_by("uniprot_accession")[:10]
     return [i.uniprot_accession for i in consurf]
+
+@api.get("/consurf/files/msa/{uniprot_accession}")
+def consurf_msa_file(request, uniprot_accession: str):
+    consurf = CONSURFModel.objects.get(uniprot_accession=uniprot_accession)
+    return sendfile(request, consurf.msa.path, mimetype="text/plain", attachment=True, attachment_filename=f"{consurf.uniprot_accession}_consurf_msa.txt")
