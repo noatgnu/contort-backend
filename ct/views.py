@@ -47,6 +47,6 @@ def consurf_msa_file(request, uniprot_accession: str):
     consurf = CONSURFModel.objects.get(uniprot_accession=uniprot_accession)
     return sendfile(request, consurf.msa.path, mimetype="text/plain", attachment=True, attachment_filename=f"{consurf.uniprot_accession}_consurf_msa.txt")
 
-@api.get("/consurf/count")
+@api.get("/count", response=int)
 def consurf_count(request):
     return CONSURFModel.objects.count()
