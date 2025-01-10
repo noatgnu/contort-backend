@@ -2,6 +2,20 @@
 
 version: '3.8'
 services:
+  contort-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: always
+    command: sh -c "tunnel --no-autoupdate run --token $(cat /etc/cloudflared/tunnel_token.txt) --hostname $(cat /etc/cloudflared/tunnel_hostname.txt)"
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+      - ./tunnel_token.txt:/etc/cloudflared/tunnel_token.txt:ro
+      - ./tunnel_hostname.txt:/etc/cloudflared/tunnel_hostname.txt:ro
+    networks:
+      - ct-net
+    environment:
+      - TUNNEL_URL=http://nginx-contortbackend:80
+
   nginx-contortbackend:
     build:
       context: .
