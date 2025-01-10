@@ -49,8 +49,8 @@ services:
         - POSTGRES_PASSWORD=postgres
         - POSTGRES_HOST=dbct
         - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
-        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost
+        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost,https://mrc-ms-r640-9.lifesci.dundee.ac.uk
+        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost,https://mrc-ms-r640-9.lifesci.dundee.ac.uk
         - ALLOWED_HOSTS=localhost
     networks:
       - ct-net
