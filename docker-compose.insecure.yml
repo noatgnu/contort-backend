@@ -14,7 +14,7 @@ services:
     networks:
       - ct-net
     environment:
-      - TUNNEL_URL=http://nginx-contortbackend:80
+      - TUNNEL_URL=https://nginx-contortbackend
 
   nginx-contortbackend:
     build:

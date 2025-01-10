@@ -7,3 +7,5 @@ data
 *.bin
 *.tar
 certs
+tunnel_token.txt
+tunnel_hostname.txt
