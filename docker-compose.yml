@@ -2,6 +2,39 @@
 
 version: '3.8'
 services:
+  nginx-contortbackend:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-nginx
+    container_name: nginx-contortbackend
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./media:/media/
+      - ./staticfiles:/static/
+      - ./certs:/etc/nginx/certs
+    depends_on:
+      - contort
+      - certsContort
+    networks:
+      - ct-net
+
+  certsContort:
+    image: alpine:latest
+    container_name: certsContort
+    command: >
+      /bin/sh -c "
+      apk add --no-cache openssl &&
+      mkdir -p /certs &&
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/nginx.key -out /certs/nginx.crt -subj '/CN=localhost'
+      "
+    volumes:
+      - ./certs:/certs
+    networks:
+      - ct-net
+
   contort:
     build:
         context: .
@@ -16,7 +49,25 @@ services:
         - POSTGRES_PASSWORD=postgres
         - POSTGRES_HOST=dbct
         - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200
+        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
+        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost
+        - ALLOWED_HOSTS=localhost
+    networks:
+      - ct-net
+
+  contortconsurf:
+    build:
+        context: .
+        dockerfile: ./dockerfiles/Dockerfile-consurf
+    container_name: contortconsurf
+    environment:
+        - POSTGRES_NAME=postgres
+        - POSTGRES_DB=postgres
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=postgres
+        - POSTGRES_HOST=dbct
+        - REDIS_HOST=redisct
+        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
         - ALLOWED_HOSTS=localhost
     networks:
       - ct-net
@@ -35,6 +86,7 @@ services:
     - ./data:/var/lib/postgresql/data
     networks:
       - ct-net
+
   redisct:
     container_name: redisct
     build:

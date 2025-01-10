@@ -1,4 +1,8 @@
+from typing import Type, Dict
+
 from ninja import Schema, UploadedFile
+from ninja_jwt.schema import TokenObtainPairInputSchema, TokenObtainInputSchemaBase
+from ninja_jwt.tokens import RefreshToken
 
 
 class CONSURFModelSchema(Schema):
@@ -50,3 +54,38 @@ class CONSURFMSAVar(Schema):
     OTHER: float
     MAX_AA: str
     ConSurf_Grade: str
+
+class ConsurfJobSchema(Schema):
+    job_title: str
+    query_sequence: str
+    alignment_program: str
+    fasta_database_id: int
+
+class ProteinFastaDatabaseSchema(Schema):
+    name: str
+    fasta_file: UploadedFile
+
+class UserSchema(Schema):
+    first_name: str
+    email: str
+
+
+class MyTokenObtainPairOutSchema(Schema):
+    refresh: str
+    access: str
+    user: UserSchema
+
+
+class MyTokenObtainPairInputSchema(TokenObtainInputSchemaBase):
+    @classmethod
+    def get_response_schema(cls) -> Type[Schema]:
+        return MyTokenObtainPairOutSchema
+
+    @classmethod
+    def get_token(cls, user) -> Dict:
+        values = {}
+        refresh = RefreshToken.for_user(user)
+        values["refresh"] = str(refresh)
+        values["access"] = str(refresh.access_token)
+        values.update(user=UserSchema.from_orm(user)) # this will be needed when creating output schema
+        return values
