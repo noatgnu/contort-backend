@@ -16,6 +16,8 @@ class CONSURFModel(models.Model):
     consurf_grade = models.FileField(upload_to="consurf_grade", blank=True, null=True)
     consurf_msa_variation = models.FileField(upload_to="consurf_msa_variation", blank=True, null=True)
     msa = models.FileField(upload_to="msa", blank=True, null=True)
+    consurf_job = models.ForeignKey("ConsurfJob", on_delete=models.SET_NULL, blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True)
 
     class Meta:
         ordering = ["id"]
@@ -47,6 +49,16 @@ class ConsurfJob(models.Model):
     log_data = models.TextField(blank=True, null=True)
     error_data = models.TextField(blank=True, null=True)
     process_cmd = models.TextField(blank=True, null=True)
+    max_homologs = models.IntegerField(default=150)
+    max_iterations = models.IntegerField(default=1)
+    substitution_model = models.CharField(max_length=255, default='BEST')
+    maximum_likelihood = models.BooleanField(default=False)
+    max_id = models.IntegerField(default=95)
+    min_id = models.IntegerField(default=35)
+    closest = models.BooleanField(default=False)
+    cutoff = models.FloatField(default=0.0001)
+    algorithm = models.CharField(max_length=255, default='HMMER')
+    email_notification = models.BooleanField(default=False)
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_auth_token(sender, instance=None, created=False, **kwargs):

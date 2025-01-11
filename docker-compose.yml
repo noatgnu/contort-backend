@@ -2,6 +2,20 @@
 
 version: '3.8'
 services:
+  contort-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: always
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+      - ./tunnel_token.txt:/etc/cloudflared/tunnel_token.txt:ro
+      - ./tunnel_hostname.txt:/etc/cloudflared/tunnel_hostname.txt:ro
+    networks:
+      - ct-net
+    env_file:
+      - .env
+
   nginx-contortbackend:
     build:
       context: .
@@ -40,6 +54,8 @@ services:
         context: .
         dockerfile: ./dockerfiles/Dockerfile
     container_name: contort
+    volumes:
+      - ./media:/app/media/
     ports:
       - "8000:8000"
     environment:
@@ -49,9 +65,9 @@ services:
         - POSTGRES_PASSWORD=postgres
         - POSTGRES_HOST=dbct
         - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
-        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost
-        - ALLOWED_HOSTS=localhost
+        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus
+        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus
+        - ALLOWED_HOSTS=localhost,contort.proteo.nexus
     networks:
       - ct-net
 
@@ -60,6 +76,8 @@ services:
         context: .
         dockerfile: ./dockerfiles/Dockerfile-consurf
     container_name: contortconsurf
+    volumes:
+      - ./media:/app/media/
     environment:
         - POSTGRES_NAME=postgres
         - POSTGRES_DB=postgres

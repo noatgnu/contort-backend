@@ -7,16 +7,16 @@ from rest_framework_simplejwt.views import (
 )
 
 from ct.views import CONSURFModelViewSet, ProteinFastaDatabaseViewSet, ConsurfJobViewSet, DataChunkedUploadView, \
-    LogoutView
+    LogoutView, UserViewSet
 
 router = DefaultRouter()
 router.register(r'consurf', CONSURFModelViewSet)
 router.register(r'fasta', ProteinFastaDatabaseViewSet)
 router.register(r'job', ConsurfJobViewSet)
-
+router.register(r'users', UserViewSet)
 urlpatterns = [
     path('api/', include(router.urls)),
-path('api/token-auth/', obtain_auth_token),
+    path('api/token-auth/', obtain_auth_token),
     path('api/chunked_upload/', DataChunkedUploadView.as_view(), name='chunked_upload'),
     path('api/chunked_upload/<uuid:pk>/', DataChunkedUploadView.as_view(), name='chunkedupload-detail'),
     path('api/logout/', LogoutView.as_view(), name='logout'),

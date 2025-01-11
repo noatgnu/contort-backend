@@ -24,15 +24,28 @@ def run_consurf_job(job_id: int):
     with open(query_file, 'w') as f:
         f.write(f"{consurf_job.query_sequence}")
     consurf_job.status = 'running'
-    process = subprocess.Popen(
-        [
+    command = [
             sys.executable,
             'stand_alone_consurf.py',
             '--seq', query_file,
             '--dir', job_path,
             '--DB', consurf_job.fasta_database.fasta_file.path,
-            '--align', consurf_job.alignment_program
-        ],
+            '--align', consurf_job.alignment_program,
+            '--MAX_HOMOLOGS', str(consurf_job.max_homologs),
+            '--iterations', str(consurf_job.max_iterations),
+            '--model', consurf_job.substitution_model,
+            '--MAX_ID', str(consurf_job.max_id),
+            '--MIN_ID', str(consurf_job.min_id),
+            '--cutoff', str(consurf_job.cutoff),
+            '--iterations', str(consurf_job.max_iterations),
+            '--algorithm', consurf_job.algorithm,
+        ]
+    if consurf_job.maximum_likelihood:
+        command.append("--Maximum_Likelihood")
+    if consurf_job.closest:
+        command.append("--closest")
+    process = subprocess.Popen(
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,

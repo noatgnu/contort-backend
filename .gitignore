@@ -9,3 +9,5 @@ data
 certs
 tunnel_token.txt
 tunnel_hostname.txt
+.cloudflared
+.env

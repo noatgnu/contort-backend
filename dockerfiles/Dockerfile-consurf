@@ -1,5 +1,6 @@
 FROM noatgnu/consurf-alone:0.0.2
 
+RUN sed -i 's|mafft --localpair --maxiterate 1000 --quiet --threads 20|mafft --localpair --maxiterate 1000 --quiet --thread 5|g' /workspace/stand_alone_consurf/stand_alone_consurf.py
 WORKDIR /app
 RUN mkdir "/app/media"
 RUN mkdir "/app/staticfiles"
@@ -9,4 +10,5 @@ COPY . /app/
 RUN /opt/miniconda/bin/conda run -n consurf_env pip3 install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
-CMD ["/opt/miniconda/bin/conda", "run", "-n", "consurf_env", "python", "manage.py", "rqworker"]
+ENTRYPOINT ["/opt/miniconda/bin/conda", "run", "-n", "consurf_env", "--no-capture-output"]
+CMD ["python", "manage.py", "rqworker"]

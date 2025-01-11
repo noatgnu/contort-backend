@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'django_sendfile',
     'django_rq',
     'rest_framework',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    'drf_chunked_upload'
 ]
 
 MIDDLEWARE = [
@@ -216,9 +217,18 @@ CACHES = {
 }
 
 REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 10
 }
+
+DRF_CHUNKED_UPLOAD_ABSTRACT_MODEL = False
+DRF_CHUNKED_UPLOAD_CHECKSUM = 'sha256'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),

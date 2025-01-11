@@ -1,6 +1,79 @@
 import re
 import pandas as pd
 
+def read_consurf_grade_file_new(file_path: str) -> pd.DataFrame:
+    column_names = [
+        'POS', 'SEQ', 'ATOM', 'SCORE', 'COLOR', 'CONFIDENCE_INTERVAL', 'CONFIDENCE_INTERVAL_COLORS',
+        'B/E', 'FUNCTION', 'MSA_DATA', 'RESIDUE_VARIETY'
+    ]
+    patterns = {
+        'POS': r'\d+',
+        'SEQ': r'[A-Z]',
+        'ATOM': r'[A-Z]{3}\d+[A-Z]?',
+        'SCORE': r'-?\d+\.\d{1,3}',
+        'COLOR': r'\d',
+        'CONFIDENCE_INTERVAL': r'-?\d+\.\d{1,3},\s+-?\d+\.\d{1,3}',
+        'CONFIDENCE_INTERVAL_COLORS': r'\d,\d',
+        'B/E': r'[be]',
+        'FUNCTION': r'[fs]',
+        'MSA_DATA': r'\d+/\d+',
+        'RESIDUE_VARIETY': r'[A-Z](, [A-Z])*'
+    }
+
+    compiled_patterns = {col: re.compile(pat) for col, pat in patterns.items()}
+    started = False
+    with open(file_path, "rt") as f:
+        data = []
+        for line in f:
+            row = {}
+            if line.startswith("*") or line.startswith("or"):
+                continue
+            if not started:
+                if "SCORE" in line and "COLOR" in line and "CONFIDENCE INTERVAL" in line:
+                    started = True
+            else:
+                if line.strip() == "":
+                    continue
+                if "normalized" in line:
+                    continue
+                start_position = 0
+                for currentColumn in column_names:
+                    match = compiled_patterns[currentColumn].search(line[start_position:])
+                    if match:
+                        if currentColumn not in ("FUNCTION", "B/E", "RESIDUE_VARIETY", "MSA_DATA"):
+                            start_position += match.end()
+                        if currentColumn == "POS":
+                            row[currentColumn] = int(match.group(0))
+                        elif currentColumn == "SCORE":
+                            row[currentColumn] = float(match.group(0))
+                        elif currentColumn == "COLOR":
+                            row[currentColumn] = [int(match.group(0))]
+                        elif currentColumn == "CONFIDENCE_INTERVAL":
+                            d = match.group(0).split(",")
+                            row["CONFIDENCE_INTERVAL"] = (float(d[0].strip()), float(d[1].strip()))
+                        elif currentColumn == "CONFIDENCE_INTERVAL_COLORS":
+                            d = match.group(0).split(",")
+                            row["CONFIDENCE_INTERVAL_COLORS"] = (d[0].strip(), d[1].strip())
+                        elif currentColumn == "RESIDUE_VARIETY":
+                            row[currentColumn] = match.group(0).replace(" ", "").split(",")
+                        elif currentColumn == "MSA_DATA":
+                            row[currentColumn] = [int(i) for i in match.group(0).split("/") if i != ""]
+                        elif currentColumn == "B/E":
+                            row["BE"] = match.group(0).strip()
+                        else:
+                            row[currentColumn] = match.group(0).strip()
+                    else:
+                        if currentColumn == "B/E":
+                            row["BE"] = None
+                        else:
+                            row[currentColumn] = None
+                    if currentColumn == "FUNCTION":
+                        data.append(row)
+
+    if len(data) == 0:
+        raise ValueError("No data found in file")
+    return pd.DataFrame(data)
+
 def read_consurf_grade_file(file_path: str) -> pd.DataFrame:
     """
     Read consurf_grade file from consurf web server and return a pandas dataframe

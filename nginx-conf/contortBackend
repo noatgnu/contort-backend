@@ -7,18 +7,19 @@ upstream django {
 
 # Configuration for the server
 server {
-    listen 80;
-    server_name 127.0.0.1 localhost;
+    #listen 80;
+    #server_name 127.0.0.1 localhost;
 
     # Redirect all HTTP requests to HTTPS
-    location / {
-        return 301 https://$host$request_uri;
-    }
+    #location / {
+    #    return 301 https://$host$request_uri;
+    #}
 }
 
 server {
     listen 443 ssl;
-    server_name 127.0.0.1 localhost;
+    listen 80;
+    server_name 127.0.0.1 localhost contort.proteo.nexus;
     client_max_body_size 100M;
     charset utf-8;
 

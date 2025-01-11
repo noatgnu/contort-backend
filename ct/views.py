@@ -1,3 +1,9 @@
+import os
+
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.signing import TimestampSigner, BadSignature
+from django.http import HttpResponse
 from django_sendfile import sendfile
 from drf_chunked_upload.exceptions import ChunkedUploadError
 from drf_chunked_upload.models import ChunkedUpload
@@ -12,7 +18,7 @@ from rest_framework.views import APIView
 
 from ct import utils
 from ct.models import CONSURFModel, ConsurfJob, ProteinFastaDatabase
-from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer
+from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer, UserSerializer
 from ct.tasks import run_consurf_job
 
 
@@ -161,9 +167,10 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
+        name = request.data.get("name")
         cu = ChunkedUpload.objects.get(id=upload_id)
         file_path = cu.file.path
-        fasta_database = ProteinFastaDatabase(name=cu.filename)
+        fasta_database = ProteinFastaDatabase(name=name, user=request.user)
         with open(file_path, "rb") as f:
             fasta_database.fasta_file.save(cu.filename, f)
         fasta_database.user = request.user
@@ -184,18 +191,146 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user_id = self.request.user.id
+        job_title = self.request.query_params.get("job_title")
+        if job_title:
+            return ConsurfJob.objects.filter(user_id=user_id, job_title__search=job_title)
         return ConsurfJob.objects.filter(user_id=user_id)
 
     def create(self, request, *args, **kwargs):
         data = request.data
         sequence = data.get("query_sequence")
-        alignment_program = data.get("alignment_program")
-        fasta_database_id = data.get("fasta_database")
+        alignment_program = data.get("alignment_program", "MAFFT")
+        fasta_database_id = data.get("fasta_database_id")
+        model = data.get("model", "BEST")
+        max_homologs = data.get("max_homologs", 150)
+        if type(max_homologs) != int:
+            max_homologs = int(max_homologs)
+        cutoff = data.get("cutoff", 0.0001)
+        if type(cutoff) != float:
+            cutoff = float(cutoff)
+        max_iterations = data.get("iterations", 1)
+        if type(max_iterations) != int:
+            max_iterations = int(max_iterations)
+        max_id = data.get("max_id", 95)
+        if type(max_id) != int:
+            max_id = int(max_id)
+        min_id = data.get("min_id", 35)
+        if type(min_id) != int:
+            min_id = int(min_id)
+        closest = data.get("closest", False)
+        if closest == "false":
+            closest = False
+        elif closest == "true":
+            closest = True
+        maximum_likelihood = data.get("maximum_likelihood", False)
+        if maximum_likelihood == "false":
+            maximum_likelihood = False
+        elif maximum_likelihood == "true":
+            maximum_likelihood = True
+        algorithm = data.get("algorithm", "HMMER")
+        job_title = data.get("job_title")
+
         fasta_database = ProteinFastaDatabase.objects.get(id=fasta_database_id, user=request.user)
-        consurf_job = ConsurfJob(user=request.user, query_sequence=sequence, alignment_program=alignment_program, fasta_database=fasta_database)
+        consurf_job = ConsurfJob(
+            user=request.user,
+            query_sequence=sequence,
+            alignment_program=alignment_program,
+            fasta_database=fasta_database,
+            max_homologs=max_homologs,
+            max_iterations=max_iterations,
+            substitution_model=model,
+            max_id=max_id,
+            min_id=min_id,
+            closest=closest,
+            cutoff=cutoff,
+            algorithm=algorithm,
+            maximum_likelihood=maximum_likelihood,
+            job_title=job_title
+        )
         consurf_job.save()
         run_consurf_job.delay(consurf_job.id)
         return Response(ConsurfJobSerializer(consurf_job).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def generate_download_token(self, request, pk=None):
+        signer = TimestampSigner()
+        token = signer.sign(pk)
+        return Response({'token': token})
+
+    @action(detail=False, methods=['get'], url_path='download', permission_classes=[permissions.AllowAny])
+    def download_file(self, request):
+        token = request.query_params.get('token')
+        file_type = request.query_params.get('file_type')
+        signer = TimestampSigner()
+        try:
+            job_id = signer.unsign(token, max_age=1800)  # 30 minutes
+        except BadSignature:
+            return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+        job = get_object_or_404(ConsurfJob, pk=job_id)
+
+        if file_type == 'zip':
+            file_name = 'Consurf_Outputs.zip'
+        elif file_type == 'msa_aa_variety_percentage':
+            file_name = 'msa_aa_variety_percentage.csv'
+        elif file_type == 'grades':
+            file_name = 'no_model_consurf_grades.txt'
+        else:
+            return Response({'error': 'Invalid file type'}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job_id), file_name)
+
+        if not os.path.exists(file_path):
+            return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        response = HttpResponse(status=200)
+        response['Content-Type'] = 'application/octet-stream'
+        response['Content-Disposition'] = f'attachment; filename={file_name}'
+        response['X-Accel-Redirect'] = f'/media/consurf_jobs/{job_id}/{file_name}'
+        return response
+
+    @action(permission_classes=[AllowAny], detail=True, methods=['get'])
+    def consurf_grade(self, request, pk=None):
+        job = self.get_object()
+        path = os.path.join(settings.MEDIA_ROOT, "consurf_jobs", str(job.id), "no_model_consurf_grades.txt")
+        print(path)
+        df = utils.read_consurf_grade_file_new(path)
+        df.fillna("", inplace=True)
+        return Response(df.to_dict(orient="records"))
+
+    @action(permission_classes=[AllowAny], detail=True, methods=['get'])
+    def consurf_msa_variation(self, request, pk=None):
+        job = self.get_object()
+        path = os.path.join(settings.MEDIA_ROOT, "consurf_jobs", str(job.id), "msa_aa_variety_percentage.csv")
+        df = utils.read_consurf_msa_variation_file(path)
+        df.fillna("", inplace=True)
+        return Response(df.to_dict(orient="records"))
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
+    parser_classes = (MultiPartParser, JSONParser)
+
+    def get_queryset(self):
+        return User.objects.filter(id=self.request.user.id)
+
+    @action(detail=False, methods=['put'], permission_classes=[permissions.IsAuthenticated])
+    def reset_password(self, request):
+        user: User = request.user
+        user.set_password(request.data.get("password"))
+        user.save()
+        return Response(UserSerializer(user).data)
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        if "first_name" in request.data:
+            user.first_name = request.data.get("first_name")
+        if "last_name" in request.data:
+            user.last_name = request.data.get("last_name")
+        if "email" in request.data:
+            user.email = request.data.get("email")
+        user.save()
+        return Response(UserSerializer(user).data)
 
 
 class LogoutView(APIView):
