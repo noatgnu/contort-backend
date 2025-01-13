@@ -1,7 +1,11 @@
+import io
+import json
 import os
 
+import requests
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files.base import File
 from django.core.signing import TimestampSigner, BadSignature
 from django.http import HttpResponse
 from django_sendfile import sendfile
@@ -17,8 +21,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ct import utils
-from ct.models import CONSURFModel, ConsurfJob, ProteinFastaDatabase
-from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer, UserSerializer
+from ct.models import CONSURFModel, ConsurfJob, ProteinFastaDatabase, MultipleSequenceAlignment, StructureFile
+from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer, UserSerializer, \
+    MultipleSequenceAlignmentSerializer, StructureFileSerializer
 from ct.tasks import run_consurf_job
 
 
@@ -182,6 +187,75 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
         instance.fasta_file.delete()
         return super().destroy(request, *args, **kwargs)
 
+class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
+    queryset = MultipleSequenceAlignment.objects.all()
+    serializer_class = MultipleSequenceAlignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, JSONParser)
+
+    def get_queryset(self):
+        user_id = self.request.user.id
+        return MultipleSequenceAlignment.objects.filter(user_id=user_id)
+
+    def create(self, request, *args, **kwargs):
+        upload_id = request.data.get("upload_id")
+        name = request.data.get("name")
+        cu = ChunkedUpload.objects.get(id=upload_id)
+        file_path = cu.file.path
+        msa = MultipleSequenceAlignment(name=name, user=request.user)
+        with open(file_path, "rb") as f:
+            msa.msa_file.save(cu.filename, f)
+
+        msa.save()
+        return Response(MultipleSequenceAlignmentSerializer(msa).data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.msa_file.delete()
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def get_all_sequence_names(self, request, pk=None):
+        msa = self.get_object()
+        path = msa.msa_file.path
+        names = utils.get_all_sequence_names_from_alignment(path)
+        return Response(names)
+
+class StructureFileViewSet(viewsets.ModelViewSet):
+    queryset = StructureFile.objects.all()
+    serializer_class = StructureFileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, JSONParser)
+
+    def get_queryset(self):
+        user_id = self.request.user.id
+        return StructureFile.objects.filter(user_id=user_id)
+
+    def create(self, request, *args, **kwargs):
+        upload_id = request.data.get("upload_id")
+        name = request.data.get("name")
+        if "name" in request.data and "content" in request.data:
+            structure = StructureFile(name=name, user=request.user)
+            content: str = json.loads(request.data["content"])
+            structure.structure_file.save(f"{name}.pdb", File(io.StringIO(content)))
+            chains = utils.get_all_pdb_chains(structure.structure_file.path)
+            structure.chains = ";".join(chains)
+            structure.save()
+        else:
+            cu = ChunkedUpload.objects.get(id=upload_id)
+            file_path = cu.file.path
+            structure = StructureFile(name=name, user=request.user)
+            with open(file_path, "rb") as f:
+                structure.structure_file.save(cu.filename, f)
+            chains = utils.get_all_pdb_chains(structure.structure_file.path)
+            structure.chains = ";".join(chains)
+            structure.save()
+        return Response(StructureFileSerializer(structure).data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.structure_file.delete()
+        return super().destroy(request, *args, **kwargs)
 
 class ConsurfJobViewSet(viewsets.ModelViewSet):
     queryset = ConsurfJob.objects.all()
@@ -198,10 +272,14 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+        uniprot_id = data.get("uniprot_id", None)
+        chain = data.get("chain", None)
+        structure_id = data.get("structure_id", None)
         sequence = data.get("query_sequence")
         alignment_program = data.get("alignment_program", "MAFFT")
         fasta_database_id = data.get("fasta_database_id")
         model = data.get("model", "BEST")
+        query_name = data.get("query_name", None)
         max_homologs = data.get("max_homologs", 150)
         if type(max_homologs) != int:
             max_homologs = int(max_homologs)
@@ -229,13 +307,13 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
             maximum_likelihood = True
         algorithm = data.get("algorithm", "HMMER")
         job_title = data.get("job_title")
+        msa_id = data.get("msa_id", None)
 
-        fasta_database = ProteinFastaDatabase.objects.get(id=fasta_database_id, user=request.user)
+
         consurf_job = ConsurfJob(
             user=request.user,
             query_sequence=sequence,
             alignment_program=alignment_program,
-            fasta_database=fasta_database,
             max_homologs=max_homologs,
             max_iterations=max_iterations,
             substitution_model=model,
@@ -245,8 +323,22 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
             cutoff=cutoff,
             algorithm=algorithm,
             maximum_likelihood=maximum_likelihood,
-            job_title=job_title
+            job_title=job_title,
+            uniprot_accession=uniprot_id
         )
+        if fasta_database_id:
+            fasta_database = ProteinFastaDatabase.objects.get(id=fasta_database_id, user=request.user)
+            consurf_job.fasta_database = fasta_database
+        if msa_id:
+            msa = MultipleSequenceAlignment.objects.get(id=msa_id, user=request.user)
+            consurf_job.msa = msa
+            consurf_job.alignment_program = None
+        if structure_id and chain:
+            structure = StructureFile.objects.get(id=structure_id, user=request.user)
+            consurf_job.structure_file = structure
+            consurf_job.chain = chain
+        if query_name:
+            consurf_job.query_name = query_name
         consurf_job.save()
         run_consurf_job.delay(consurf_job.id)
         return Response(ConsurfJobSerializer(consurf_job).data)
@@ -305,6 +397,17 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
         df.fillna("", inplace=True)
         return Response(df.to_dict(orient="records"))
 
+    @action(detail=False)
+    def get_pdb(self, request):
+        uniprot_id = request.query_params.get("uniprotID")
+        url = f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            pdb_url = data[0].get("pdbUrl")
+            res = requests.get(pdb_url)
+            return Response(res.content)
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     permission_classes = [permissions.IsAuthenticated]
@@ -320,6 +423,23 @@ class UserViewSet(viewsets.ModelViewSet):
         user.set_password(request.data.get("password"))
         user.save()
         return Response(UserSerializer(user).data)
+
+    def create(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def register(self, request):
+        token = request.data.get("token", None)
+        if token is None:
+            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        signer = TimestampSigner()
+        try:
+            email = signer.unsign(token, max_age=60*60*24*7)  # 1 week
+            user = User.objects.create_user(email=email, username=email, password=request.data.get("password"))
+            return Response(UserSerializer(user).data)
+        except BadSignature:
+            return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
+
 
     def update(self, request, *args, **kwargs):
         user = request.user

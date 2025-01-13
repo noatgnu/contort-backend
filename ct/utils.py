@@ -163,3 +163,22 @@ def read_consurf_msa_variation_file(file_path: str) -> pd.DataFrame:
     df["ConSurf Grade"] = df["ConSurf Grade"].astype(str)
     df.rename(columns={"ConSurf Grade": "ConSurf_Grade", "MAX AA": "MAX_AA"}, inplace=True)
     return df
+
+def get_all_pdb_chains(file_path: str) -> list[str]:
+    results = []
+    with open(file_path, "rt") as f:
+        for line in f:
+            line = line.strip()
+            if line[:4] == "ATOM" or line[:6] == "HETATM":
+                results.append(line[21])
+    return list(set(results))
+
+def get_all_sequence_names_from_alignment(file_path: str) -> list[str]:
+    results = []
+    with open(file_path, "rt") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(">"):
+                results.append(line[1:].split(" ")[0])
+
+    return list(set(results))

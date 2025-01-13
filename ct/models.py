@@ -37,11 +37,24 @@ class ProteinFastaDatabase(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
+class MultipleSequenceAlignment(models.Model):
+    name = models.CharField(max_length=255)
+    msa_file = models.FileField(upload_to="msa_files")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+class StructureFile(models.Model):
+    name = models.CharField(max_length=255)
+    structure_file = models.FileField(upload_to="structure_files")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    chains = models.TextField(blank=True, null=True)
+
 class ConsurfJob(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     job_title = models.CharField(max_length=255)
-    query_sequence = models.TextField()
-    alignment_program = models.CharField(max_length=255)
+    query_sequence = models.TextField(blank=True, null=True)
+    alignment_program = models.CharField(max_length=255, blank=True, null=True)
     fasta_database = models.ForeignKey(ProteinFastaDatabase, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=50, default='pending')
@@ -59,6 +72,11 @@ class ConsurfJob(models.Model):
     cutoff = models.FloatField(default=0.0001)
     algorithm = models.CharField(max_length=255, default='HMMER')
     email_notification = models.BooleanField(default=False)
+    msa = models.ForeignKey(MultipleSequenceAlignment, on_delete=models.SET_NULL, null=True, blank=True)
+    uniprot_accession = models.CharField(max_length=20, blank=True, null=True)
+    chain = models.CharField(max_length=1, blank=True, null=True)
+    structure_file = models.ForeignKey(StructureFile, on_delete=models.SET_NULL, null=True, blank=True)
+    query_name = models.CharField(max_length=255, blank=True, null=True)
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_auth_token(sender, instance=None, created=False, **kwargs):

@@ -30,7 +30,6 @@ def run_consurf_job(job_id: int):
             '--seq', query_file,
             '--dir', job_path,
             '--DB', consurf_job.fasta_database.fasta_file.path,
-            '--align', consurf_job.alignment_program,
             '--MAX_HOMOLOGS', str(consurf_job.max_homologs),
             '--iterations', str(consurf_job.max_iterations),
             '--model', consurf_job.substitution_model,
@@ -44,6 +43,15 @@ def run_consurf_job(job_id: int):
         command.append("--Maximum_Likelihood")
     if consurf_job.closest:
         command.append("--closest")
+    if consurf_job.msa:
+        command.extend(['--msa', consurf_job.msa.msa_file.path])
+    else:
+        if consurf_job.alignment_program:
+            command.extend(['--align', consurf_job.alignment_program])
+    if consurf_job.structure_file and consurf_job.chain:
+        command.extend(['--structure', consurf_job.structure_file.structure_file.path, '--chain', consurf_job.chain])
+    if consurf_job.query_name:
+        command.extend(['--query', consurf_job.query_name])
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -53,17 +61,23 @@ def run_consurf_job(job_id: int):
     )
     consurf_job.process_cmd = " ".join(process.args)
     consurf_job.save()
-    while process.poll() is None:
-        line = process.stdout.readline()
-        if line:
-            pipe_out.append(line.decode())
+    while True:
+        output = process.stdout.readline()
+        error = process.stderr.readline()
+        if output == b'' and error == b'' and process.poll() is not None:
+            break
+        if output:
+            pipe_out.append(output.decode())
             consurf_job.log_data = "".join(pipe_out)
-        line = process.stderr.readline()
-        if line:
-            pipe_err.append(line.decode())
+        if error:
+            pipe_err.append(error.decode())
             consurf_job.error_data = "".join(pipe_err)
         consurf_job.save()
-
     consurf_job.status = 'completed' if process.returncode == 0 else 'failed'
+    if os.path.exists(os.path.join(job_path, "Consurf_Outputs.zip")):
+        consurf_job.status = 'completed'
+    else:
+        consurf_job.status = 'failed'
+
     consurf_job.save()
     return consurf_job.id

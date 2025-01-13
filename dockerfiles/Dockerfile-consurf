@@ -1,6 +1,8 @@
 FROM noatgnu/consurf-alone:0.0.2
 
-RUN sed -i 's|mafft --localpair --maxiterate 1000 --quiet --threads 20|mafft --localpair --maxiterate 1000 --quiet --thread 5|g' /workspace/stand_alone_consurf/stand_alone_consurf.py
+#RUN sed -i 's|mafft --localpair --maxiterate 1000 --quiet --threads 20|mafft --localpair --maxiterate 1000 --quiet --thread 5|g' /workspace/stand_alone_consurf/stand_alone_consurf.py
+#RUN sed -e '3979,3991d' -e '3978a\    first_seq_with_gaps = lines[0]' /workspace/stand_alone_consurf/stand_alone_consurf.py > /workspace/stand_alone_consurf/stand_alone_consurf.py
+#RUN sed -e '3978a\    second_seq_with_gaps = lines[2]' /workspace/stand_alone_consurf/stand_alone_consurf.py > /workspace/stand_alone_consurf/stand_alone_consurf.py
 WORKDIR /app
 RUN mkdir "/app/media"
 RUN mkdir "/app/staticfiles"

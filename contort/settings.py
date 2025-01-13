@@ -173,7 +173,9 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "withCredentials",
-    "http_x_xsrf_token"
+    "http_x_xsrf_token",
+    "content-range",
+    "content-disposition",
 ]
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:4200").split(",")
 CORS_ORIGIN_WHITELIST = os.environ.get("CORS_ORIGIN_WHITELIST", "http://localhost:4200").split(",")

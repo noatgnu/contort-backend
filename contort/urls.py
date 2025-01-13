@@ -7,13 +7,15 @@ from rest_framework_simplejwt.views import (
 )
 
 from ct.views import CONSURFModelViewSet, ProteinFastaDatabaseViewSet, ConsurfJobViewSet, DataChunkedUploadView, \
-    LogoutView, UserViewSet
+    LogoutView, UserViewSet, MultipleSequenceAlignmentViewSet, StructureFileViewSet
 
 router = DefaultRouter()
 router.register(r'consurf', CONSURFModelViewSet)
 router.register(r'fasta', ProteinFastaDatabaseViewSet)
 router.register(r'job', ConsurfJobViewSet)
 router.register(r'users', UserViewSet)
+router.register(r'msa', MultipleSequenceAlignmentViewSet)
+router.register(r'structure', StructureFileViewSet)
 urlpatterns = [
     path('api/', include(router.urls)),
     path('api/token-auth/', obtain_auth_token),
