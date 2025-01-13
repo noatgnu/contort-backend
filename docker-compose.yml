@@ -2,6 +2,16 @@
 
 version: '3.8'
 services:
+  contort-frontend:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/Dockerfile-frontend
+    container_name: contort-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - ct-net
+
   contort-cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
