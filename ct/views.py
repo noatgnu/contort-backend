@@ -484,7 +484,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def get_unique_session_id(self, request):
         signer = TimestampSigner()
-        token = signer.sign(request.user.email+uuid.uuid4().hex)
+        token = signer.sign(uuid.uuid4().hex)
 
         return Response({'token': token})
 
