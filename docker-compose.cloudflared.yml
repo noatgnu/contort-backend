@@ -12,19 +12,19 @@ services:
     networks:
       - ct-net
 
-  #contort-cloudflared:
-  #  image: cloudflare/cloudflared:latest
-  #  container_name: cloudflared
-  #  restart: always
-  #  command: tunnel --no-autoupdate run
-  #  volumes:
-  #    - ./cloudflared:/etc/cloudflared
-  #    - ./tunnel_token.txt:/etc/cloudflared/tunnel_token.txt:ro
-  #    - ./tunnel_hostname.txt:/etc/cloudflared/tunnel_hostname.txt:ro
-  #  networks:
-  #    - ct-net
-  #  env_file:
-  #    - .env
+  contort-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: always
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+      - ./tunnel_token.txt:/etc/cloudflared/tunnel_token.txt:ro
+      - ./tunnel_hostname.txt:/etc/cloudflared/tunnel_hostname.txt:ro
+    networks:
+      - ct-net
+    env_file:
+      - .env
 
   nginx-contortbackend:
     build:
@@ -68,16 +68,9 @@ services:
       - ./media:/app/media/
     ports:
       - "8000:8000"
-    environment:
-        - POSTGRES_NAME=postgres
-        - POSTGRES_DB=postgres
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_HOST=dbct
-        - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus
-        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus,http://localhost:4200
-        - ALLOWED_HOSTS=localhost,contort.proteo.nexus
+    env_file:
+      - .env
+
     networks:
       - ct-net
 

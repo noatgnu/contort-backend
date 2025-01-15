@@ -27,6 +27,11 @@ markdown = "^3.7"
 djangorestframework-simplejwt = "^5.4.0"
 drf-chunked-upload = "^0.6.0"
 requests = "^2.32.3"
+uvicorn = "^0.34.0"
+uvicorn-worker = "^0.3.0"
+channels = "^4.2.0"
+websockets = "^14.1"
+channels-redis = {extras = ["cryptography"], version = "^4.2.1"}
 
 
 [build-system]

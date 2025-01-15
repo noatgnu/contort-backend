@@ -46,7 +46,8 @@ INSTALLED_APPS = [
     'django_rq',
     'rest_framework',
     'rest_framework.authtoken',
-    'drf_chunked_upload'
+    'drf_chunked_upload',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -82,7 +83,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'contort.wsgi.application'
-
+ASGI_APPLICATION = 'contort.asgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
@@ -176,6 +177,8 @@ CORS_ALLOW_HEADERS = [
     "http_x_xsrf_token",
     "content-range",
     "content-disposition",
+    "x-contort-session-id",
+    "http-x-cinder-session-id"
 ]
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:4200").split(",")
 CORS_ORIGIN_WHITELIST = os.environ.get("CORS_ORIGIN_WHITELIST", "http://localhost:4200").split(",")
@@ -245,4 +248,15 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            "symmetric_encryption_keys": [SECRET_KEY]
+        },
+    },
 }

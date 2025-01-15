@@ -3,14 +3,29 @@ import os
 import subprocess
 import sys
 
+from asgiref.sync import async_to_sync
+from channels.layers import channel_layers
 from django_rq import job
 from ct.models import ConsurfJob
 from django.conf import settings
 
 
 @job('default', timeout='3h')
-def run_consurf_job(job_id: int):
+def run_consurf_job(job_id: int, session_id: str):
+    channel = channel_layers.get_channel_layer()
     consurf_job = ConsurfJob.objects.get(id=job_id)
+    async_to_sync(channel.group_send)(
+        f'job_{session_id}',
+        {
+            'type': 'job_status',
+            'job_id': job_id,
+            'status': consurf_job.status,
+            'session_id': session_id,
+            'log_data': "",
+            'error_data': "",
+            'message': "Job started"
+        }
+    )
     env = copy.deepcopy(os.environ)
     env['PYTHONPATH'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env['VIRTUAL_ENV'] = os.getenv('VIRTUAL_ENV', '')
@@ -64,20 +79,46 @@ def run_consurf_job(job_id: int):
     while True:
         output = process.stdout.readline()
         error = process.stderr.readline()
+
         if output == b'' and error == b'' and process.poll() is not None:
             break
+        data = {
+            'type': 'job_status',
+            'job_id': job_id,
+            'status': consurf_job.status,
+            'session_id': session_id,
+            'log_data': "",
+            'error_data': "",
+        }
         if output:
             pipe_out.append(output.decode())
             consurf_job.log_data = "".join(pipe_out)
+            data['log_data'] = pipe_out[-1]
         if error:
             pipe_err.append(error.decode())
             consurf_job.error_data = "".join(pipe_err)
+            data['error_data'] = pipe_err[-1]
         consurf_job.save()
+        async_to_sync(channel.group_send)(
+            f'job_{session_id}',
+            data
+        )
     consurf_job.status = 'completed' if process.returncode == 0 else 'failed'
     if os.path.exists(os.path.join(job_path, "Consurf_Outputs.zip")):
         consurf_job.status = 'completed'
     else:
         consurf_job.status = 'failed'
+    async_to_sync(channel.group_send)(
+        f'job_{session_id}',
+        {
+            'type': 'job_status',
+            'job_id': job_id,
+            'status': consurf_job.status,
+            'session_id': session_id,
+            'log_data': "",
+            'error_data': "",
+        }
+    )
 
     consurf_job.save()
     return consurf_job.id

@@ -18,4 +18,4 @@ COPY . /app/
 RUN pip install -r requirements.txt
 
 EXPOSE 8000
-CMD ["gunicorn", "--workers=2", "contort.wsgi:application", "--bind", "0.0.0.0:8000", "--log-level=debug","--timeout", "300"]
+CMD ["gunicorn", "--workers=2", "contort.asgi:application", "--bind", "0.0.0.0:8000", "--log-level=debug","--timeout", "300", "-k", "uvicorn.workers.UvicornWorker"]

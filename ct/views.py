@@ -1,19 +1,24 @@
 import io
 import json
 import os
+import uuid
 
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import File
 from django.core.signing import TimestampSigner, BadSignature
+from django.db.models import Q
 from django.http import HttpResponse
+from django_filters.rest_framework import DjangoFilterBackend
+from django_filters.views import FilterMixin
 from django_sendfile import sendfile
 from drf_chunked_upload.exceptions import ChunkedUploadError
 from drf_chunked_upload.models import ChunkedUpload
 from drf_chunked_upload.views import ChunkedUploadView
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.permissions import AllowAny
@@ -123,6 +128,8 @@ class CONSURFModelViewSet(viewsets.ModelViewSet):
     serializer_class = CONSURFModelSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+
+
     @action(permission_classes=[AllowAny], detail=False, methods=['get'], url_path='consurf_grade/(?P<uniprot_accession>[^/.]+)')
     def consurf_grade(self, request, uniprot_accession=None):
         if uniprot_accession is None:
@@ -165,10 +172,15 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
     serializer_class = ProteinFastaDatabaseSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, JSONParser)
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name']
 
     def get_queryset(self):
         user_id = self.request.user.id
-        return ProteinFastaDatabase.objects.filter(user_id=user_id)
+        query = Q()
+        # get all fasta database that either belongs to the user or is public
+        query &= (Q(user_id=user_id) | Q(user_id=None))
+        return self.queryset.filter(query)
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -192,10 +204,15 @@ class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
     serializer_class = MultipleSequenceAlignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, JSONParser)
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name']
 
     def get_queryset(self):
         user_id = self.request.user.id
-        return MultipleSequenceAlignment.objects.filter(user_id=user_id)
+        query = Q()
+        # get all msa that either belongs to the user or is public
+        query &= (Q(user_id=user_id) | Q(user_id=None))
+        return self.queryset.filter(query)
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -226,10 +243,15 @@ class StructureFileViewSet(viewsets.ModelViewSet):
     serializer_class = StructureFileSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, JSONParser)
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['name']
 
     def get_queryset(self):
         user_id = self.request.user.id
-        return StructureFile.objects.filter(user_id=user_id)
+        query = Q()
+        # get all structure files that either belongs to the user or is public
+        query &= (Q(user_id=user_id) | Q(user_id=None))
+        return self.queryset.filter(query)
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -257,20 +279,27 @@ class StructureFileViewSet(viewsets.ModelViewSet):
         instance.structure_file.delete()
         return super().destroy(request, *args, **kwargs)
 
-class ConsurfJobViewSet(viewsets.ModelViewSet):
+class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
     queryset = ConsurfJob.objects.all()
     serializer_class = ConsurfJobSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = (MultiPartParser, JSONParser)
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['job_title', 'uniprot_accession']
+
 
     def get_queryset(self):
         user_id = self.request.user.id
-        job_title = self.request.query_params.get("job_title")
-        if job_title:
-            return ConsurfJob.objects.filter(user_id=user_id, job_title__search=job_title)
-        return ConsurfJob.objects.filter(user_id=user_id)
+        print(self.request.__dict__)
+        query = Q()
+        if user_id:
+            query &= Q(user_id=user_id)
+        return self.queryset.filter(query)
 
     def create(self, request, *args, **kwargs):
+        #get contort_session_id from request headers
+        contort_session_id = request.META.get("HTTP_X_CONTORT_SESSION_ID")
+        print(contort_session_id)
         data = request.data
         uniprot_id = data.get("uniprot_id", None)
         chain = data.get("chain", None)
@@ -340,7 +369,7 @@ class ConsurfJobViewSet(viewsets.ModelViewSet):
         if query_name:
             consurf_job.query_name = query_name
         consurf_job.save()
-        run_consurf_job.delay(consurf_job.id)
+        run_consurf_job.delay(consurf_job.id, contort_session_id)
         return Response(ConsurfJobSerializer(consurf_job).data)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
@@ -452,6 +481,12 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
         return Response(UserSerializer(user).data)
 
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def get_unique_session_id(self, request):
+        signer = TimestampSigner()
+        token = signer.sign(request.user.email+uuid.uuid4().hex)
+
+        return Response({'token': token})
 
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
