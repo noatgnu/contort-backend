@@ -84,15 +84,8 @@ services:
     restart: always
     volumes:
       - ./media:/app/media/
-    environment:
-        - POSTGRES_NAME=postgres
-        - POSTGRES_DB=postgres
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_HOST=dbct
-        - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
-        - ALLOWED_HOSTS=localhost
+    env_file:
+      - .env
     networks:
       - ct-net
 
