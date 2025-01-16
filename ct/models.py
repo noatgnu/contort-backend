@@ -79,6 +79,10 @@ class ConsurfJob(models.Model):
     query_name = models.CharField(max_length=255, blank=True, null=True)
     session_id = models.CharField(max_length=255, blank=True, null=True)
 
+    class Meta:
+        ordering = ["-id"]
+        app_label = "ct"
+
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
