@@ -10,7 +10,7 @@ from ct.models import ConsurfJob
 from django.conf import settings
 
 
-@job('default', timeout='3h')
+@job('default')
 def run_consurf_job(job_id: int, session_id: str):
     channel = get_channel_layer()
     consurf_job = ConsurfJob.objects.get(id=job_id)
