@@ -100,12 +100,12 @@ def run_consurf_job(job_id: int, session_id: str):
             o = output.decode()
             pipe_out.append(o)
             consurf_job.log_data = "".join(pipe_out)
-            data['message']['log_data'] = o
+            #data['message']['log_data'] = o
         if error:
             e = error.decode()
             pipe_err.append(e)
             consurf_job.error_data = "".join(pipe_err)
-            data['message']['error_data'] = e
+            #data['message']['error_data'] = e
         consurf_job.save()
         async_to_sync(channel.group_send)(
             f'job_{session_id}',
