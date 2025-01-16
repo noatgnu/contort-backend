@@ -287,13 +287,14 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['job_title', 'uniprot_accession']
 
-
     def get_queryset(self):
         user_id = self.request.user.id
-        print(self.request.__dict__)
         query = Q()
         if user_id:
             query &= Q(user_id=user_id)
+        status = self.request.query_params.get("status", None)
+        if status:
+            query &= Q(status=status)
         return self.queryset.filter(query)
 
     def create(self, request, *args, **kwargs):
