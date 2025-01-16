@@ -353,7 +353,8 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
             algorithm=algorithm,
             maximum_likelihood=maximum_likelihood,
             job_title=job_title,
-            uniprot_accession=uniprot_id
+            uniprot_accession=uniprot_id,
+            session_id=contort_session_id
         )
         if fasta_database_id:
             fasta_database = ProteinFastaDatabase.objects.get(id=fasta_database_id, user=request.user)

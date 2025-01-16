@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 from asgiref.sync import async_to_sync
-from channels.layers import channel_layers
+from channels.layers import get_channel_layer
 from django_rq import job
 from ct.models import ConsurfJob
 from django.conf import settings
@@ -12,18 +12,21 @@ from django.conf import settings
 
 @job('default', timeout='3h')
 def run_consurf_job(job_id: int, session_id: str):
-    channel = channel_layers.get_channel_layer()
+    channel = get_channel_layer()
     consurf_job = ConsurfJob.objects.get(id=job_id)
     async_to_sync(channel.group_send)(
         f'job_{session_id}',
         {
-            'type': 'job_status',
-            'job_id': job_id,
-            'status': consurf_job.status,
-            'session_id': session_id,
-            'log_data': "",
-            'error_data': "",
-            'message': "Job started"
+            'type': 'job_message',
+            'message': {
+                'job_id': job_id,
+                'status': consurf_job.status,
+                'session_id': session_id,
+                'log_data': "",
+                'error_data': "",
+                'message': "Job started"
+            }
+
         }
     )
     env = copy.deepcopy(os.environ)
@@ -83,21 +86,28 @@ def run_consurf_job(job_id: int, session_id: str):
         if output == b'' and error == b'' and process.poll() is not None:
             break
         data = {
-            'type': 'job_status',
-            'job_id': job_id,
-            'status': consurf_job.status,
-            'session_id': session_id,
-            'log_data': "",
-            'error_data': "",
+            'type': 'job_message',
+            'message': {
+                'job_id': job_id,
+                'status': consurf_job.status,
+                'session_id': session_id,
+                'log_data': "",
+                'error_data': "",
+                'message': ""
+            }
         }
         if output:
-            pipe_out.append(output.decode())
+            o = output.decode()
+            pipe_out.append(o)
             consurf_job.log_data = "".join(pipe_out)
-            data['log_data'] = pipe_out[-1]
+            print(o)
+            data['message']['log_data'] = o
         if error:
-            pipe_err.append(error.decode())
+            e = error.decode()
+            pipe_err.append(e)
             consurf_job.error_data = "".join(pipe_err)
-            data['error_data'] = pipe_err[-1]
+            print(e)
+            data['message']['error_data'] = e
         consurf_job.save()
         async_to_sync(channel.group_send)(
             f'job_{session_id}',
@@ -111,12 +121,15 @@ def run_consurf_job(job_id: int, session_id: str):
     async_to_sync(channel.group_send)(
         f'job_{session_id}',
         {
-            'type': 'job_status',
-            'job_id': job_id,
-            'status': consurf_job.status,
-            'session_id': session_id,
-            'log_data': "",
-            'error_data': "",
+            'type': 'job_message',
+            'message': {
+                'job_id': job_id,
+                'status': consurf_job.status,
+                'session_id': session_id,
+                'log_data': "",
+                'error_data': "",
+                'message': ""
+            }
         }
     )
 

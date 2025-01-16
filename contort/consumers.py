@@ -4,7 +4,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 class JobConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         self.session_id = self.scope['url_route']['kwargs']['session_id']
-
+        user = self.scope['user']
         await self.channel_layer.group_add(
             "job_" + self.session_id,
             self.channel_name
@@ -31,5 +31,5 @@ class JobConsumer(AsyncJsonWebsocketConsumer):
         )
 
     async def job_message(self, event):
-        await self.send_json({"message": event})
+        await self.send_json(event["message"])
 

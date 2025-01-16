@@ -77,6 +77,7 @@ class ConsurfJob(models.Model):
     chain = models.CharField(max_length=1, blank=True, null=True)
     structure_file = models.ForeignKey(StructureFile, on_delete=models.SET_NULL, null=True, blank=True)
     query_name = models.CharField(max_length=255, blank=True, null=True)
+    session_id = models.CharField(max_length=255, blank=True, null=True)
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_auth_token(sender, instance=None, created=False, **kwargs):

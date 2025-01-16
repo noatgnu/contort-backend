@@ -7,6 +7,7 @@ services:
       context: .
       dockerfile: ./dockerfiles/Dockerfile-frontend
     container_name: contort-frontend
+    restart: always
     ports:
       - "3000:80"
     networks:
@@ -48,6 +49,7 @@ services:
   certsContort:
     image: alpine:latest
     container_name: certsContort
+    restart: always
     command: >
       /bin/sh -c "
       apk add --no-cache openssl &&
@@ -64,6 +66,7 @@ services:
         context: .
         dockerfile: ./dockerfiles/Dockerfile
     container_name: contort
+    restart: always
     volumes:
       - ./media:/app/media/
     ports:
@@ -86,6 +89,7 @@ services:
         context: .
         dockerfile: ./dockerfiles/Dockerfile-consurf
     container_name: contortconsurf
+    restart: always
     volumes:
       - ./media:/app/media/
     environment:
