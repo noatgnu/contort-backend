@@ -132,5 +132,34 @@ services:
     networks:
       - ct-net
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      DB_VENDOR: POSTGRES
+      DB_ADDR: keycloakdb
+      DB_DATABASE: keycloak
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    networks:
+      - ct-net
+    command: [ 'start-dev' ]
+    ports:
+      - "8080:8080"
+    restart: always
+
+  keycloakdb:
+    image: postgres:14
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: keycloak
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./keycloak-data:/var/lib/postgresql/data
+    restart: always
+
 networks:
     ct-net:
