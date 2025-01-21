@@ -316,5 +316,5 @@ if os.environ.get("KEYCLOAK_CLIENT_ID", None):
     }
 
     HEADLESS_TOKEN_STRATEGY = "ct.token_strategy.TokenStrategy"
-
+    ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
