@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from ct.views import CONSURFModelViewSet, ProteinFastaDatabaseViewSet, ConsurfJobViewSet, DataChunkedUploadView, \
-    LogoutView, UserViewSet, MultipleSequenceAlignmentViewSet, StructureFileViewSet
+    LogoutView, UserViewSet, MultipleSequenceAlignmentViewSet, StructureFileViewSet, set_csrf
 
 router = DefaultRouter()
 router.register(r'consurf', CONSURFModelViewSet)
@@ -23,4 +23,7 @@ urlpatterns = [
     path('api/chunked_upload/<uuid:pk>/', DataChunkedUploadView.as_view(), name='chunkedupload-detail'),
     path('api/logout/', LogoutView.as_view(), name='logout'),
     path('api-auth/', include('rest_framework.urls')),
+    path('accounts/', include('allauth.urls')),
+    path("_allauth/", include("allauth.headless.urls")),
+    path("api/set-csrf/", set_csrf, name="set_csrf"),
 ]

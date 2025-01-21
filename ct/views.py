@@ -9,7 +9,8 @@ from django.contrib.auth.models import User
 from django.core.files.base import File
 from django.core.signing import TimestampSigner, BadSignature
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters.views import FilterMixin
 from django_sendfile import sendfile
@@ -496,3 +497,8 @@ class LogoutView(APIView):
 
     def post(self, request):
         return Response(status=status.HTTP_200_OK)
+
+
+@ensure_csrf_cookie
+def set_csrf(request):
+    return JsonResponse(data={"data": "CSRF cookie set"}, status=status.HTTP_200_OK)

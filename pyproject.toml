@@ -32,6 +32,9 @@ uvicorn-worker = "^0.3.0"
 channels = "^4.2.0"
 websockets = "^14.1"
 channels-redis = {extras = ["cryptography"], version = "^4.2.1"}
+django-allauth = "^65.3.1"
+fido2 = "^1.2.0"
+verbose-csrf-middleware = "^1.0.4"
 
 
 [build-system]

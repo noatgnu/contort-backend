@@ -47,7 +47,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'drf_chunked_upload',
-    'channels'
+    'channels',
+    'allauth',
+    'allauth.account',
+    'allauth.headless',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.openid_connect',
+    'allauth.mfa',
+    'allauth.usersessions',
 ]
 
 MIDDLEWARE = [
@@ -57,8 +64,10 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
+    'verbose_csrf_middleware.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -178,8 +187,16 @@ CORS_ALLOW_HEADERS = [
     "content-range",
     "content-disposition",
     "x-contort-session-id",
-    "http-x-cinder-session-id"
+    "http-x-cinder-session-id",
+    "http-x-csrftoken",
+    'x-session-token',
+    'http-x-session-token',
 ]
+CSRF_FAILURE_VIEW = "ct.csrf_failure.csrf_failure"
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_NAME = "csrfToken"
+CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:4200").split(",")
 CORS_ORIGIN_WHITELIST = os.environ.get("CORS_ORIGIN_WHITELIST", "http://localhost:4200").split(",")
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
@@ -220,13 +237,17 @@ CACHES = {
         }
     }
 }
-
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 10
@@ -260,3 +281,40 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+SOCIALACCOUNT_PROVIDERS = {
+    "openid_connect": {
+        "APPS": [
+
+        ]
+    }
+}
+
+ACCOUNT_ADAPTER = 'ct.account_adapter.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'ct.account_adapter.CustomSocialAccountAdapter'
+
+HEADLESS_ONLY = True
+
+if os.environ.get("KEYCLOAK_CLIENT_ID", None):
+    SOCIALACCOUNT_PROVIDERS["openid_connect"]["APPS"].append(
+        {
+            "provider_id": "keycloak",
+            "name": "Keycloak",
+            "client_id": os.environ.get("KEYCLOAK_CLIENT_ID", None),
+            "secret": os.environ.get("KEYCLOAK_SECRET", None),
+            "settings": {
+                "server_url": os.environ.get("KEYCLOAK_SERVER_URL", "http://localhost:8080/auth/realms/carcosa"),
+            },
+        }
+    )
+
+    HEADLESS_FRONTEND_URLS = {
+        #"account_confirm_email": "https://app.project.org/account/verify-email/{key}",
+        #"account_reset_password_from_key": "https://app.org/account/password/reset/key/{key}",
+        #"account_signup": "https://app.org/account/signup",
+    }
+
+    HEADLESS_TOKEN_STRATEGY = "ct.token_strategy.TokenStrategy"
+
+

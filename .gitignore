@@ -11,3 +11,6 @@ tunnel_token.txt
 tunnel_hostname.txt
 .cloudflared
 .env
+.env-dev
+keycloak-data
+keycloak-config

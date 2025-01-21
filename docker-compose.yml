@@ -49,12 +49,11 @@ services:
   certsContort:
     image: alpine:latest
     container_name: certsContort
-    restart: always
     command: >
       /bin/sh -c "
       apk add --no-cache openssl &&
       mkdir -p /certs &&
-      openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/nginx.key -out /certs/nginx.crt -subj '/CN=localhost'
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/keycloak.key -out /certs/keycloak.crt -subj '/CN=localhost'
       "
     volumes:
       - ./certs:/certs
@@ -71,16 +70,8 @@ services:
       - ./media:/app/media/
     ports:
       - "8000:8000"
-    environment:
-        - POSTGRES_NAME=postgres
-        - POSTGRES_DB=postgres
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_HOST=dbct
-        - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus
-        - CSRF_TRUSTED_ORIGINS=http://localhost,https://localhost,https://contort.proteo.nexus,http://contort.proteo.nexus,http://localhost:4200
-        - ALLOWED_HOSTS=localhost,contort.proteo.nexus
+    env_file:
+      - .env-dev
     networks:
       - ct-net
 
@@ -92,15 +83,9 @@ services:
     restart: always
     volumes:
       - ./media:/app/media/
-    environment:
-        - POSTGRES_NAME=postgres
-        - POSTGRES_DB=postgres
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-        - POSTGRES_HOST=dbct
-        - REDIS_HOST=redisct
-        - CORS_ORIGIN_WHITELIST=http://localhost,http://localhost:4200,https://localhost
-        - ALLOWED_HOSTS=localhost
+    env_file:
+      - .env-dev
+
     networks:
       - ct-net
 
@@ -135,31 +120,41 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      DB_VENDOR: POSTGRES
-      DB_ADDR: keycloakdb
-      DB_DATABASE: keycloak
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_USER: keycloak
+      KC_DB_PASSWORD: postgres
+      KC_DB_URL : jdbc:postgresql://keycloakdb:5432/keycloak
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HOSTNAME: localhost
+
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/test-realm.json
+    volumes:
+      - ./keycloak-config/test-realm.json:/opt/keycloak/data/import/realm-config.json
     networks:
       - ct-net
-    command: [ 'start-dev' ]
+    command: start --http-port=8080 --http-enabled=true --hostname-strict=false --verbose
     ports:
       - "8080:8080"
     restart: always
+    depends_on:
+      - keycloakdb
 
   keycloakdb:
     image: postgres:14
     environment:
       POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
+      POSTGRES_USER: keycloak
       POSTGRES_DB: keycloak
     ports:
       - "5433:5432"
     volumes:
       - ./keycloak-data:/var/lib/postgresql/data
     restart: always
+    networks:
+      - ct-net
 
 networks:
     ct-net:

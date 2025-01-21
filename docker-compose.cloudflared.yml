@@ -5,7 +5,7 @@ services:
   contort-frontend:
     build:
       context: .
-      dockerfile: ./dockerfiles/Dockerfile-frontend
+      dockerfile: ./dockerfiles/Dockerfile-frontend-prod
     container_name: contort-frontend
     restart: always
     ports:
