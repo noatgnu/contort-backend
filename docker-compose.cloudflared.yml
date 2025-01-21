@@ -30,7 +30,7 @@ services:
   nginx-contortbackend:
     build:
       context: .
-      dockerfile: ./dockerfiles/Dockerfile-nginx
+      dockerfile: ./dockerfiles/Dockerfile-nginx-prod
     container_name: nginx-contortbackend
     restart: always
     ports:
