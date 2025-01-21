@@ -1,4 +1,4 @@
 FROM nginx:1.21.3
 
 RUN rm -rf /etc/nginx/user.conf.d/*
-COPY ./nginx-conf/contortBackendProd /etc/nginx/conf.d/contortBackend.conf
+COPY ./nginx-conf/contortBackend /etc/nginx/conf.d/contortBackend.conf

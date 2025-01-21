@@ -59,6 +59,8 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Pass requests to the Daphne server
@@ -71,6 +73,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
     location /admin {
         proxy_pass http://django/admin;
@@ -81,6 +84,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /ws {
@@ -92,6 +96,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /accounts {
@@ -103,6 +108,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /_allauth {
@@ -114,6 +120,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Referer $http_referer;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Additional configuration can be added as needed
