@@ -10,7 +10,7 @@ RUN apt install -y git
 RUN git clone https://github.com/noatgnu/Contort.git
 
 RUN sed -i "s;https://contort.captain.151-80-32-156.muttsu.xyz;https://${API_HOST};g" /app/Contort/src/environments/environment.ts
-RUN sed -i "s;https://localhost;https://${API_HOST};g" /app/Contort/src/environments/environment.prod.ts
+RUN sed -i "s;https://localhost;https://${API_HOST};g" /app/Contort/src/environments/environment.ts
 WORKDIR /app/Contort
 RUN npm install
 RUN npm run build
