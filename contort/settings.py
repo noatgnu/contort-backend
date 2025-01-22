@@ -295,7 +295,8 @@ ACCOUNT_ADAPTER = 'ct.account_adapter.CustomAccountAdapter'
 SOCIALACCOUNT_ADAPTER = 'ct.account_adapter.CustomSocialAccountAdapter'
 
 HEADLESS_ONLY = True
-
+SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 if os.environ.get("KEYCLOAK_CLIENT_ID", None):
     SOCIALACCOUNT_PROVIDERS["openid_connect"]["APPS"].append(
         {
@@ -317,6 +318,5 @@ if os.environ.get("KEYCLOAK_CLIENT_ID", None):
 
     HEADLESS_TOKEN_STRATEGY = "ct.token_strategy.TokenStrategy"
     ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
-    SECURE_SSL_REDIRECT = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
