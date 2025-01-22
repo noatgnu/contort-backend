@@ -117,44 +117,44 @@ services:
     networks:
       - ct-net
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_USER: keycloak
-      KC_DB_PASSWORD: postgres
-      KC_DB_URL : jdbc:postgresql://keycloakdb:5432/keycloak
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HOSTNAME: localhost
-
-      KEYCLOAK_IMPORT: /opt/keycloak/data/import/test-realm.json
-    volumes:
-      - ./keycloak-config/test-realm.json:/opt/keycloak/data/import/realm-config.json
-    networks:
-      - ct-net
-    command: start --http-port=8080 --http-enabled=true --hostname-strict=false --verbose
-    ports:
-      - "8080:8080"
-    restart: always
-    depends_on:
-      - keycloakdb
-
-  keycloakdb:
-    image: postgres:14
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: keycloak
-      POSTGRES_DB: keycloak
-    ports:
-      - "5433:5432"
-    volumes:
-      - ./keycloak-data:/var/lib/postgresql/data
-    restart: always
-    networks:
-      - ct-net
+#  keycloak:
+#    image: quay.io/keycloak/keycloak:latest
+#    environment:
+#      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+#      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+#      KC_DB: postgres
+#      KC_DB_USER: keycloak
+#      KC_DB_PASSWORD: postgres
+#      KC_DB_URL : jdbc:postgresql://keycloakdb:5432/keycloak
+#      KC_HOSTNAME_STRICT: false
+#      KC_HOSTNAME_STRICT_HTTPS: false
+#      KC_HOSTNAME: localhost
+#
+#      KEYCLOAK_IMPORT: /opt/keycloak/data/import/test-realm.json
+#    volumes:
+#      - ./keycloak-config/test-realm.json:/opt/keycloak/data/import/realm-config.json
+#    networks:
+#      - ct-net
+#    command: start --http-port=8080 --http-enabled=true --hostname-strict=false --verbose
+#    ports:
+#      - "8080:8080"
+#    restart: always
+#    depends_on:
+#      - keycloakdb
+#
+#  keycloakdb:
+#    image: postgres:14
+#    environment:
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_USER: keycloak
+#      POSTGRES_DB: keycloak
+#    ports:
+#      - "5433:5432"
+#    volumes:
+#      - ./keycloak-data:/var/lib/postgresql/data
+#    restart: always
+#    networks:
+#      - ct-net
 
 networks:
     ct-net:

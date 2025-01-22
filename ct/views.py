@@ -18,6 +18,7 @@ from drf_chunked_upload.exceptions import ChunkedUploadError
 from drf_chunked_upload.models import ChunkedUpload
 from drf_chunked_upload.views import ChunkedUploadView
 from rest_framework import viewsets, permissions, status
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.generics import get_object_or_404
@@ -490,6 +491,12 @@ class UserViewSet(viewsets.ModelViewSet):
         token = signer.sign(uuid.uuid4().hex)
 
         return Response({'token': token})
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def get_token(self, request):
+        user: User = request.user
+        token = Token.objects.get(user=user)
+        return Response({'token': token.key})
 
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
