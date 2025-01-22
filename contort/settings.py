@@ -295,7 +295,9 @@ ACCOUNT_ADAPTER = 'ct.account_adapter.CustomAccountAdapter'
 SOCIALACCOUNT_ADAPTER = 'ct.account_adapter.CustomSocialAccountAdapter'
 
 HEADLESS_ONLY = True
-SECURE_SSL_REDIRECT = True
+
+if os.environ.get("SECURE_SSL_REDIRECT", "True") == "True":
+    SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 if os.environ.get("KEYCLOAK_CLIENT_ID", None):
     SOCIALACCOUNT_PROVIDERS["openid_connect"]["APPS"].append(
