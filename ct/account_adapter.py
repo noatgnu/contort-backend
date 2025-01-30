@@ -1,5 +1,6 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.contrib.auth.models import User
 
 
 class NoNewUserSignupAdapter(DefaultAccountAdapter):
@@ -34,4 +35,8 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
             user = sociallogin.user
             if not user.username:
                 user.username = user.email
-            user.save()
+            try:
+                existing_user = User.objects.get(email=user.email)
+                sociallogin.connect(request, existing_user)
+            except User.DoesNotExist:
+                user.save()

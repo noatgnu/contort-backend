@@ -4,6 +4,7 @@ import os
 import uuid
 
 import requests
+from allauth.socialaccount.models import SocialAccount, SocialToken
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import File
@@ -497,6 +498,36 @@ class UserViewSet(viewsets.ModelViewSet):
         user: User = request.user
         token = Token.objects.get(user=user)
         return Response({'token': token.key})
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def logout_provider(self, request):
+        user: User = request.user
+        social_account = SocialAccount.objects.filter(user=user).first()
+        social_token = SocialToken.objects.filter(account__user=user)
+        if social_token.exists():
+            social_token = social_token.first()
+            access_token = social_token.token
+            refresh_token = social_token.token_secret
+            if social_account.provider == 'keycloak':
+                for i in settings.SOCIALACCOUNT_PROVIDERS["openid_connect"]["APPS"]:
+                    if i["provider_id"] == "keycloak":
+                        keycloak = i
+                        logout_payload = {
+                            "client_id": keycloak["client_id"],
+                            "refresh_token": refresh_token,
+                            "client_secret": keycloak["secret"],
+                        }
+                        headers = {
+                            "Authorization": "Bearer " + access_token,
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        }
+                        server_realm = keycloak["settings"]["server_url"].replace(".well-known/openid-configuration",
+                                                                                  "")
+                        result = requests.post(f"{server_realm}/protocol/openid-connect/logout", data=logout_payload,
+                                               headers=headers)
+                        social_token.delete()
+        logout(request)
+        return Response(status=status.HTTP_200_OK)
 
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
