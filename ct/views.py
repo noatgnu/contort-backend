@@ -6,6 +6,7 @@ import uuid
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from django.conf import settings
+from django.contrib.auth import logout
 from django.contrib.auth.models import User
 from django.core.files.base import File
 from django.core.signing import TimestampSigner, BadSignature
