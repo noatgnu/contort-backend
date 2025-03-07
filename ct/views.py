@@ -427,7 +427,11 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
     def consurf_grade(self, request, pk=None):
         job = self.get_object()
         path = os.path.join(settings.MEDIA_ROOT, "consurf_jobs", str(job.id), "no_model_consurf_grades.txt")
-        print(path)
+        if not os.path.exists(path):
+            for file in os.listdir(os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job.id))):
+                if file.endswith('_consurf_grades.txt'):
+                    path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job.id), file)
+                    break
         df = utils.read_consurf_grade_file_new(path)
         df.fillna("", inplace=True)
         return Response(df.to_dict(orient="records"))
