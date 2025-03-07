@@ -393,7 +393,7 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
             job_id = signer.unsign(token, max_age=1800)  # 30 minutes
         except BadSignature:
             return Response({'error': 'Invalid or expired token'}, status=status.HTTP_400_BAD_REQUEST)
-        job = get_object_or_404(ConsurfJob, pk=job_id)
+        job: ConsurfJob = get_object_or_404(ConsurfJob, pk=job_id)
 
         if file_type == 'zip':
             file_name = 'Consurf_Outputs.zip'
@@ -407,7 +407,15 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
         file_path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job_id), file_name)
 
         if not os.path.exists(file_path):
-            return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
+            if job.structure_file:
+                # if the file is not found, look for a file endeds with _consurf_grades.txt
+                # this is a workaround for the issue where the file name is not consistent
+                for file in os.listdir(os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job_id))):
+                    if file.endswith('_consurf_grades.txt'):
+                        file_name = file
+                        break
+            else:
+                return Response({'error': 'File not found'}, status=status.HTTP_404_NOT_FOUND)
 
         response = HttpResponse(status=200)
         response['Content-Type'] = 'application/octet-stream'
