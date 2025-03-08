@@ -549,6 +549,15 @@ class LogoutView(APIView):
     def post(self, request):
         return Response(status=status.HTTP_200_OK)
 
+class GetUniProtProxy(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, JSONParser)
+
+    def get(self, request):
+        accession = request.query_params.get("accession")
+        response = requests.get(f"https://rest.uniprot.org/uniprotkb/{accession}")
+        return Response(response.json())
+
 
 @ensure_csrf_cookie
 def set_csrf(request):
