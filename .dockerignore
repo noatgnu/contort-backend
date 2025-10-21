@@ -1,3 +1,10 @@
 data
 *.bin
 *.tar
+keycloak-data
+keycloak-config
+tunnel_hostname.txt
+tunnel_token.txt
+certs
+.cloudflared
+media

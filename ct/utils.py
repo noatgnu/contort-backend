@@ -1,5 +1,51 @@
 import re
 import pandas as pd
+import zipfile
+import os
+import tempfile
+
+def read_consurf_grade_from_zip(zip_path, grade_filename=None):
+    """
+    Extract and read consurf_grades.txt file from a zip archive
+
+    Parameters:
+    zip_path (str): Path to the zip file
+    grade_filename (str, optional): Specific filename to look for. If None, will look for
+                                   any file ending with '_consurf_grades.txt'
+
+    Returns:
+    pd.DataFrame: DataFrame containing the parsed consurf grades
+    """
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        # Find the consurf grades file
+        if grade_filename is None:
+            # Look for any file ending with _consurf_grades.txt
+            for file in zip_ref.namelist():
+                if file.endswith('_consurf_grades.txt') or file == 'no_model_consurf_grades.txt':
+                    grade_filename = file
+                    break
+
+            if grade_filename is None:
+                raise FileNotFoundError("No consurf grades file found in the zip archive")
+
+        # Create a temporary file to extract to
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_path = temp_file.name
+
+        # Extract the file to the temporary location
+        zip_ref.extract(grade_filename, path=os.path.dirname(temp_path))
+        extracted_path = os.path.join(os.path.dirname(temp_path), grade_filename)
+
+        try:
+            # Read the extracted file
+            df = read_consurf_grade_file_new(extracted_path)
+            return df
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(extracted_path):
+                os.remove(extracted_path)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
 def read_consurf_grade_file_new(file_path: str) -> pd.DataFrame:
     column_names = [
