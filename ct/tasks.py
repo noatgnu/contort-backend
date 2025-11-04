@@ -79,38 +79,55 @@ def run_consurf_job(job_id: int, session_id: str):
     )
     consurf_job.process_cmd = " ".join(process.args)
     consurf_job.save()
+
+    line_count = 0
+    save_interval = 10
+
     while True:
         output = process.stdout.readline()
         error = process.stderr.readline()
 
         if output == b'' and error == b'' and process.poll() is not None:
             break
-        data = {
-            'type': 'job_message',
-            'message': {
-                'job_id': job_id,
-                'status': consurf_job.status,
-                'session_id': session_id,
-                'log_data': "",
-                'error_data': "",
-                'message': ""
-            }
-        }
+
+        has_new_output = False
+
         if output:
             o = output.decode()
             pipe_out.append(o)
-            consurf_job.log_data = "".join(pipe_out)
-            #data['message']['log_data'] = o
+            has_new_output = True
+            line_count += 1
+
         if error:
             e = error.decode()
             pipe_err.append(e)
-            consurf_job.error_data = "".join(pipe_err)
-            #data['message']['error_data'] = e
-        consurf_job.save()
-        async_to_sync(channel.group_send)(
-            f'job_{session_id}',
-            data
-        )
+            has_new_output = True
+            line_count += 1
+
+        if has_new_output:
+            if line_count >= save_interval:
+                consurf_job.log_data = "".join(pipe_out)
+                consurf_job.error_data = "".join(pipe_err)
+                consurf_job.save()
+                line_count = 0
+
+            async_to_sync(channel.group_send)(
+                f'job_{session_id}',
+                {
+                    'type': 'job_message',
+                    'message': {
+                        'job_id': job_id,
+                        'status': consurf_job.status,
+                        'session_id': session_id,
+                        'log_data': "",
+                        'error_data': "",
+                        'message': ""
+                    }
+                }
+            )
+
+    consurf_job.log_data = "".join(pipe_out)
+    consurf_job.error_data = "".join(pipe_err)
     consurf_job.status = 'completed' if process.returncode == 0 else 'failed'
     if os.path.exists(os.path.join(job_path, "Consurf_Outputs.zip")):
         consurf_job.status = 'completed'
