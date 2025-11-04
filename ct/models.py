@@ -36,12 +36,16 @@ class ProteinFastaDatabase(models.Model):
     fasta_file = models.FileField(upload_to="fasta_files")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_public = models.BooleanField(default=False)
+    shared_with = models.ManyToManyField(User, related_name='shared_fasta_databases', blank=True)
 
 class MultipleSequenceAlignment(models.Model):
     name = models.CharField(max_length=255)
     msa_file = models.FileField(upload_to="msa_files")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_public = models.BooleanField(default=False)
+    shared_with = models.ManyToManyField(User, related_name='shared_msas', blank=True)
 
 class StructureFile(models.Model):
     name = models.CharField(max_length=255)
@@ -49,6 +53,8 @@ class StructureFile(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     chains = models.TextField(blank=True, null=True)
+    is_public = models.BooleanField(default=False)
+    shared_with = models.ManyToManyField(User, related_name='shared_structures', blank=True)
 
 class ConsurfJob(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -78,6 +84,7 @@ class ConsurfJob(models.Model):
     structure_file = models.ForeignKey(StructureFile, on_delete=models.SET_NULL, null=True, blank=True)
     query_name = models.CharField(max_length=255, blank=True, null=True)
     session_id = models.CharField(max_length=255, blank=True, null=True)
+    rq_job_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         ordering = ["-id"]

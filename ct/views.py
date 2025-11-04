@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shutil
 import uuid
 
 import requests
@@ -34,6 +35,7 @@ from ct.models import CONSURFModel, ConsurfJob, ProteinFastaDatabase, MultipleSe
 from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer, UserSerializer, \
     MultipleSequenceAlignmentSerializer, StructureFileSerializer
 from ct.tasks import run_consurf_job
+import django_rq
 
 
 class DataChunkedUploadView(ChunkedUploadView):
@@ -182,9 +184,8 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user_id = self.request.user.id
         query = Q()
-        # get all fasta database that either belongs to the user or is public
-        query &= (Q(user_id=user_id) | Q(user_id=None))
-        return self.queryset.filter(query)
+        query &= (Q(user_id=user_id) | Q(is_public=True) | Q(shared_with__id=user_id))
+        return self.queryset.filter(query).distinct()
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -200,8 +201,42 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.user != request.user:
+            return Response({'error': 'Only the owner can delete this file'}, status=status.HTTP_403_FORBIDDEN)
         instance.fasta_file.delete()
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def share(self, request, pk=None):
+        fasta_db = self.get_object()
+        if fasta_db.user != request.user:
+            return Response({'error': 'Only the owner can share this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        fasta_db.shared_with.add(*users)
+        return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def unshare(self, request, pk=None):
+        fasta_db = self.get_object()
+        if fasta_db.user != request.user:
+            return Response({'error': 'Only the owner can unshare this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        fasta_db.shared_with.remove(*users)
+        return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def set_public(self, request, pk=None):
+        fasta_db = self.get_object()
+        if fasta_db.user != request.user:
+            return Response({'error': 'Only the owner can change visibility'}, status=status.HTTP_403_FORBIDDEN)
+
+        fasta_db.is_public = request.data.get('is_public', False)
+        fasta_db.save()
+        return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
 
 class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
     queryset = MultipleSequenceAlignment.objects.all()
@@ -214,9 +249,8 @@ class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user_id = self.request.user.id
         query = Q()
-        # get all msa that either belongs to the user or is public
-        query &= (Q(user_id=user_id) | Q(user_id=None))
-        return self.queryset.filter(query)
+        query &= (Q(user_id=user_id) | Q(is_public=True) | Q(shared_with__id=user_id))
+        return self.queryset.filter(query).distinct()
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -232,6 +266,8 @@ class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.user != request.user:
+            return Response({'error': 'Only the owner can delete this file'}, status=status.HTTP_403_FORBIDDEN)
         instance.msa_file.delete()
         return super().destroy(request, *args, **kwargs)
 
@@ -241,6 +277,38 @@ class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
         path = msa.msa_file.path
         names = utils.get_all_sequence_names_from_alignment(path)
         return Response(names)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def share(self, request, pk=None):
+        msa = self.get_object()
+        if msa.user != request.user:
+            return Response({'error': 'Only the owner can share this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        msa.shared_with.add(*users)
+        return Response(MultipleSequenceAlignmentSerializer(msa).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def unshare(self, request, pk=None):
+        msa = self.get_object()
+        if msa.user != request.user:
+            return Response({'error': 'Only the owner can unshare this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        msa.shared_with.remove(*users)
+        return Response(MultipleSequenceAlignmentSerializer(msa).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def set_public(self, request, pk=None):
+        msa = self.get_object()
+        if msa.user != request.user:
+            return Response({'error': 'Only the owner can change visibility'}, status=status.HTTP_403_FORBIDDEN)
+
+        msa.is_public = request.data.get('is_public', False)
+        msa.save()
+        return Response(MultipleSequenceAlignmentSerializer(msa).data)
 
 class StructureFileViewSet(viewsets.ModelViewSet):
     queryset = StructureFile.objects.all()
@@ -253,9 +321,8 @@ class StructureFileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user_id = self.request.user.id
         query = Q()
-        # get all structure files that either belongs to the user or is public
-        query &= (Q(user_id=user_id) | Q(user_id=None))
-        return self.queryset.filter(query)
+        query &= (Q(user_id=user_id) | Q(is_public=True) | Q(shared_with__id=user_id))
+        return self.queryset.filter(query).distinct()
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")
@@ -280,8 +347,42 @@ class StructureFileViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if instance.user != request.user:
+            return Response({'error': 'Only the owner can delete this file'}, status=status.HTTP_403_FORBIDDEN)
         instance.structure_file.delete()
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def share(self, request, pk=None):
+        structure = self.get_object()
+        if structure.user != request.user:
+            return Response({'error': 'Only the owner can share this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        structure.shared_with.add(*users)
+        return Response(StructureFileSerializer(structure).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def unshare(self, request, pk=None):
+        structure = self.get_object()
+        if structure.user != request.user:
+            return Response({'error': 'Only the owner can unshare this file'}, status=status.HTTP_403_FORBIDDEN)
+
+        usernames = request.data.get('usernames', [])
+        users = User.objects.filter(username__in=usernames)
+        structure.shared_with.remove(*users)
+        return Response(StructureFileSerializer(structure).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def set_public(self, request, pk=None):
+        structure = self.get_object()
+        if structure.user != request.user:
+            return Response({'error': 'Only the owner can change visibility'}, status=status.HTTP_403_FORBIDDEN)
+
+        structure.is_public = request.data.get('is_public', False)
+        structure.save()
+        return Response(StructureFileSerializer(structure).data)
 
 class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
     queryset = ConsurfJob.objects.all()
@@ -362,20 +463,37 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
             session_id=contort_session_id
         )
         if fasta_database_id:
-            fasta_database = ProteinFastaDatabase.objects.get(id=fasta_database_id, user=request.user)
+            fasta_database = ProteinFastaDatabase.objects.filter(
+                Q(id=fasta_database_id) &
+                (Q(user=request.user) | Q(is_public=True) | Q(shared_with=request.user))
+            ).first()
+            if not fasta_database:
+                return Response({'error': 'FASTA database not found or not accessible'}, status=status.HTTP_404_NOT_FOUND)
             consurf_job.fasta_database = fasta_database
         if msa_id:
-            msa = MultipleSequenceAlignment.objects.get(id=msa_id, user=request.user)
+            msa = MultipleSequenceAlignment.objects.filter(
+                Q(id=msa_id) &
+                (Q(user=request.user) | Q(is_public=True) | Q(shared_with=request.user))
+            ).first()
+            if not msa:
+                return Response({'error': 'MSA not found or not accessible'}, status=status.HTTP_404_NOT_FOUND)
             consurf_job.msa = msa
             consurf_job.alignment_program = None
         if structure_id and chain:
-            structure = StructureFile.objects.get(id=structure_id, user=request.user)
+            structure = StructureFile.objects.filter(
+                Q(id=structure_id) &
+                (Q(user=request.user) | Q(is_public=True) | Q(shared_with=request.user))
+            ).first()
+            if not structure:
+                return Response({'error': 'Structure file not found or not accessible'}, status=status.HTTP_404_NOT_FOUND)
             consurf_job.structure_file = structure
             consurf_job.chain = chain
         if query_name:
             consurf_job.query_name = query_name
         consurf_job.save()
-        run_consurf_job.delay(consurf_job.id, contort_session_id)
+        rq_job = run_consurf_job.delay(consurf_job.id, contort_session_id)
+        consurf_job.rq_job_id = rq_job.id
+        consurf_job.save()
         return Response(ConsurfJobSerializer(consurf_job).data)
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
@@ -443,6 +561,39 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
         df = utils.read_consurf_msa_variation_file(path)
         df.fillna("", inplace=True)
         return Response(df.to_dict(orient="records"))
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def cancel(self, request, pk=None):
+        """Cancel a running ConSurf job and clean up its folder"""
+        job = self.get_object()
+
+        if job.user != request.user:
+            return Response({'error': 'Only the job owner can cancel it'}, status=status.HTTP_403_FORBIDDEN)
+
+        if job.status not in ['pending', 'running']:
+            return Response({'error': f'Cannot cancel job with status: {job.status}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not job.rq_job_id:
+            return Response({'error': 'No RQ job ID found'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            queue = django_rq.get_queue('default')
+            rq_job = queue.fetch_job(job.rq_job_id)
+
+            if rq_job:
+                rq_job.cancel()
+                job.status = 'cancelled'
+                job.save()
+
+                job_path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job.id))
+                if os.path.exists(job_path):
+                    shutil.rmtree(job_path)
+
+                return Response({'message': 'Job cancelled successfully and folder cleaned up', 'status': job.status})
+            else:
+                return Response({'error': 'RQ job not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': f'Failed to cancel job: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False)
     def get_pdb(self, request):
