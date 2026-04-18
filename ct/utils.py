@@ -220,11 +220,36 @@ def get_all_pdb_chains(file_path: str) -> list[str]:
     return list(set(results))
 
 def get_all_sequence_names_from_alignment(file_path: str) -> list[str]:
-    results = []
+    """Extract sequence names from a FASTA, Clustal, Nexus, or MSF alignment file."""
+    results = set()
+    fmt = None
     with open(file_path, "rt") as f:
         for line in f:
-            line = line.strip()
-            if line.startswith(">"):
-                results.append(line[1:].split(" ")[0])
-
-    return list(set(results))
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if fmt is None:
+                if stripped.startswith(">"):
+                    fmt = "fasta"
+                elif stripped.startswith("CLUSTAL") or stripped[0] == "C":
+                    fmt = "clustal"
+                elif stripped.startswith("MSF:"):
+                    fmt = "msf"
+                elif stripped[0] == "#":
+                    fmt = "nexus"
+                else:
+                    break
+            if fmt == "fasta":
+                if stripped.startswith(">"):
+                    results.add(stripped[1:].split()[0])
+            elif fmt == "clustal":
+                if stripped and not stripped.startswith("CLUSTAL") and not stripped.startswith(" "):
+                    name = stripped.split()[0]
+                    if name:
+                        results.add(name)
+            elif fmt in ("msf", "nexus"):
+                if stripped.startswith("Name:"):
+                    parts = stripped.split()
+                    if len(parts) > 1:
+                        results.add(parts[1])
+    return list(results)
