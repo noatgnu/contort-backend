@@ -1,4 +1,4 @@
-# docker build -f dockerfiles/Dockerfile-base -t noatgnu/contort-base:0.1.0 .
+# docker build -f dockerfiles/Dockerfile-base -t noatgnu/contort-base:0.1.1 .
 FROM noatgnu/contort-base:0.1.1
 
 EXPOSE 8000

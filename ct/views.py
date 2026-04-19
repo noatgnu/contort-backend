@@ -238,6 +238,14 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
         fasta_db.save()
         return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
 
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def preview(self, request, pk=None):
+        fasta_db = self.get_object()
+        response = HttpResponse(status=200)
+        response['Content-Type'] = 'text/plain'
+        response['X-Accel-Redirect'] = f'/media/{fasta_db.fasta_file.name}'
+        return response
+
 class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
     queryset = MultipleSequenceAlignment.objects.all()
     serializer_class = MultipleSequenceAlignmentSerializer
@@ -309,6 +317,14 @@ class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
         msa.is_public = request.data.get('is_public', False)
         msa.save()
         return Response(MultipleSequenceAlignmentSerializer(msa).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def preview(self, request, pk=None):
+        msa = self.get_object()
+        response = HttpResponse(status=200)
+        response['Content-Type'] = 'text/plain'
+        response['X-Accel-Redirect'] = f'/media/{msa.msa_file.name}'
+        return response
 
 class StructureFileViewSet(viewsets.ModelViewSet):
     queryset = StructureFile.objects.all()
@@ -383,6 +399,14 @@ class StructureFileViewSet(viewsets.ModelViewSet):
         structure.is_public = request.data.get('is_public', False)
         structure.save()
         return Response(StructureFileSerializer(structure).data)
+
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def preview(self, request, pk=None):
+        structure = self.get_object()
+        response = HttpResponse(status=200)
+        response['Content-Type'] = 'text/plain'
+        response['X-Accel-Redirect'] = f'/media/{structure.structure_file.name}'
+        return response
 
 class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
     queryset = ConsurfJob.objects.all()
