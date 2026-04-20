@@ -4,6 +4,9 @@ import os
 import shutil
 import uuid
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialToken
 from django.conf import settings
@@ -606,16 +609,32 @@ class ConsurfJobViewSet(viewsets.ModelViewSet, FilterMixin):
 
             if rq_job:
                 rq_job.cancel()
-                job.status = 'cancelled'
-                job.save()
 
-                job_path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job.id))
-                if os.path.exists(job_path):
-                    shutil.rmtree(job_path)
+            job.status = 'cancelled'
+            job.save()
 
-                return Response({'message': 'Job cancelled successfully and folder cleaned up', 'status': job.status})
-            else:
-                return Response({'error': 'RQ job not found'}, status=status.HTTP_404_NOT_FOUND)
+            job_path = os.path.join(settings.MEDIA_ROOT, 'consurf_jobs', str(job.id))
+            if os.path.exists(job_path):
+                shutil.rmtree(job_path)
+
+            if job.session_id:
+                channel = get_channel_layer()
+                async_to_sync(channel.group_send)(
+                    f'job_{job.session_id}',
+                    {
+                        'type': 'job_message',
+                        'message': {
+                            'job_id': job.id,
+                            'status': 'cancelled',
+                            'session_id': job.session_id,
+                            'log_data': '',
+                            'error_data': '',
+                            'message': 'Job cancelled'
+                        }
+                    }
+                )
+
+            return Response({'message': 'Job cancelled successfully and folder cleaned up', 'status': job.status})
         except Exception as e:
             return Response({'error': f'Failed to cancel job: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
