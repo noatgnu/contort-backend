@@ -42,6 +42,7 @@ def run_consurf_job(job_id: int, session_id: str):
     consurf_job.status = 'running'
     command = [
         sys.executable,
+        '-u',
         'stand_alone_consurf.py',
         '--dir', job_path,
         '--model', consurf_job.substitution_model,
@@ -87,33 +88,33 @@ def run_consurf_job(job_id: int, session_id: str):
 
     line_count = 0
     save_interval = 10
+    watched = [process.stdout, process.stderr]
 
-    while True:
-        readable, _, _ = select.select([process.stdout, process.stderr], [], [], 0.1)
+    while watched or process.poll() is None:
+        readable, _, _ = select.select(watched, [], [], 0.1)
 
-        if not readable and process.poll() is not None:
-            break
+        if not readable:
+            continue
 
         has_new_output = False
 
-        if process.stdout in readable:
-            output = process.stdout.readline()
-            if output:
-                pipe_out.append(output.decode())
-                has_new_output = True
-                line_count += 1
-
-        if process.stderr in readable:
-            error = process.stderr.readline()
-            if error:
-                pipe_err.append(error.decode())
-                has_new_output = True
-                line_count += 1
+        for fd in list(readable):
+            data = fd.readline()
+            if not data:
+                watched.remove(fd)
+                continue
+            if fd is process.stdout:
+                pipe_out.append(data.decode())
+            else:
+                pipe_err.append(data.decode())
+            has_new_output = True
+            line_count += 1
 
         if has_new_output:
+            consurf_job.log_data = "".join(pipe_out)
+            consurf_job.error_data = "".join(pipe_err)
+            line_count += 1
             if line_count >= save_interval:
-                consurf_job.log_data = "".join(pipe_out)
-                consurf_job.error_data = "".join(pipe_err)
                 consurf_job.save()
                 line_count = 0
 
@@ -125,8 +126,8 @@ def run_consurf_job(job_id: int, session_id: str):
                         'job_id': job_id,
                         'status': consurf_job.status,
                         'session_id': session_id,
-                        'log_data': "",
-                        'error_data': "",
+                        'log_data': consurf_job.log_data,
+                        'error_data': consurf_job.error_data,
                         'message': ""
                     }
                 }
