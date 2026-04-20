@@ -1,8 +1,8 @@
 import copy
 import os
-import select
 import subprocess
 import sys
+import time
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -27,15 +27,12 @@ def run_consurf_job(job_id: int, session_id: str):
                 'error_data': "",
                 'message': "Job started"
             }
-
         }
     )
     env = copy.deepcopy(os.environ)
     env['PYTHONPATH'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env['VIRTUAL_ENV'] = os.getenv('VIRTUAL_ENV', '')
     env['PATH'] = os.path.dirname(sys.executable) + os.pathsep + env['PATH']
-    pipe_out = []
-    pipe_err = []
     media_path = settings.MEDIA_ROOT
     job_path = os.path.join(media_path, "consurf_jobs", str(job_id))
     os.makedirs(job_path, exist_ok=True)
@@ -76,6 +73,7 @@ def run_consurf_job(job_id: int, session_id: str):
         command.extend(['--structure', consurf_job.structure_file.structure_file.path, '--chain', consurf_job.chain])
     if consurf_job.query_name:
         command.extend(['--query', consurf_job.query_name])
+
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -86,60 +84,80 @@ def run_consurf_job(job_id: int, session_id: str):
     consurf_job.process_cmd = " ".join(process.args)
     consurf_job.save()
 
-    line_count = 0
-    save_interval = 10
-    watched = [process.stdout, process.stderr]
+    os.set_blocking(process.stdout.fileno(), False)
+    os.set_blocking(process.stderr.fileno(), False)
 
-    while watched or process.poll() is None:
-        readable, _, _ = select.select(watched, [], [], 0.1)
+    stdout_chunks = []
+    stderr_chunks = []
+    stdout_eof = False
+    stderr_eof = False
+    last_ws_time = 0.0
+    ws_interval = 2.0
+    save_count = 0
+    save_interval = 50
 
-        if not readable:
-            continue
+    while not (stdout_eof and stderr_eof):
+        had_data = False
 
-        has_new_output = False
+        if not stdout_eof:
+            try:
+                chunk = os.read(process.stdout.fileno(), 4096)
+                if chunk:
+                    stdout_chunks.append(chunk.decode(errors='replace'))
+                    had_data = True
+                    save_count += 1
+                else:
+                    stdout_eof = True
+            except BlockingIOError:
+                pass
 
-        for fd in list(readable):
-            data = fd.readline()
-            if not data:
-                watched.remove(fd)
-                continue
-            if fd is process.stdout:
-                pipe_out.append(data.decode())
-            else:
-                pipe_err.append(data.decode())
-            has_new_output = True
-            line_count += 1
+        if not stderr_eof:
+            try:
+                chunk = os.read(process.stderr.fileno(), 4096)
+                if chunk:
+                    stderr_chunks.append(chunk.decode(errors='replace'))
+                    had_data = True
+                    save_count += 1
+                else:
+                    stderr_eof = True
+            except BlockingIOError:
+                pass
 
-        if has_new_output:
-            consurf_job.log_data = "".join(pipe_out)
-            consurf_job.error_data = "".join(pipe_err)
-            line_count += 1
-            if line_count >= save_interval:
-                consurf_job.save()
-                line_count = 0
-
-            async_to_sync(channel.group_send)(
-                f'job_{session_id}',
-                {
-                    'type': 'job_message',
-                    'message': {
-                        'job_id': job_id,
-                        'status': consurf_job.status,
-                        'session_id': session_id,
-                        'log_data': consurf_job.log_data,
-                        'error_data': consurf_job.error_data,
-                        'message': ""
+        if had_data:
+            now = time.time()
+            if now - last_ws_time >= ws_interval:
+                last_ws_time = now
+                consurf_job.log_data = "".join(stdout_chunks)
+                consurf_job.error_data = "".join(stderr_chunks)
+                if save_count >= save_interval:
+                    consurf_job.save()
+                    save_count = 0
+                async_to_sync(channel.group_send)(
+                    f'job_{session_id}',
+                    {
+                        'type': 'job_message',
+                        'message': {
+                            'job_id': job_id,
+                            'status': consurf_job.status,
+                            'session_id': session_id,
+                            'log_data': consurf_job.log_data,
+                            'error_data': consurf_job.error_data,
+                            'message': ""
+                        }
                     }
-                }
-            )
+                )
+        else:
+            time.sleep(0.1)
 
-    consurf_job.log_data = "".join(pipe_out)
-    consurf_job.error_data = "".join(pipe_err)
-    consurf_job.status = 'completed' if process.returncode == 0 else 'failed'
+    process.wait()
+
+    consurf_job.log_data = "".join(stdout_chunks)
+    consurf_job.error_data = "".join(stderr_chunks)
     if os.path.exists(os.path.join(job_path, "Consurf_Outputs.zip")):
         consurf_job.status = 'completed'
     else:
         consurf_job.status = 'failed'
+
     async_to_sync(channel.group_send)(
         f'job_{session_id}',
         {
@@ -148,8 +166,8 @@ def run_consurf_job(job_id: int, session_id: str):
                 'job_id': job_id,
                 'status': consurf_job.status,
                 'session_id': session_id,
-                'log_data': "",
-                'error_data': "",
+                'log_data': consurf_job.log_data,
+                'error_data': consurf_job.error_data,
                 'message': ""
             }
         }
