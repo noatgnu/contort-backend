@@ -37,7 +37,7 @@ from ct import utils
 from ct.models import CONSURFModel, ConsurfJob, ProteinFastaDatabase, MultipleSequenceAlignment, StructureFile
 from ct.serializers import CONSURFModelSerializer, ProteinFastaDatabaseSerializer, ConsurfJobSerializer, UserSerializer, \
     MultipleSequenceAlignmentSerializer, StructureFileSerializer
-from ct.tasks import run_consurf_job
+from ct.tasks import run_consurf_job, build_blast_index, build_mmseqs_index
 import django_rq
 
 
@@ -248,6 +248,26 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
         response['Content-Type'] = 'text/plain'
         response['X-Accel-Redirect'] = f'/media/{fasta_db.fasta_file.name}'
         return response
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def build_blast(self, request, pk=None):
+        fasta_db = self.get_object()
+        if fasta_db.blast_index_status == 'building':
+            return Response({'error': 'BLAST index is already being built'}, status=status.HTTP_400_BAD_REQUEST)
+        build_blast_index.delay(fasta_db.id)
+        fasta_db.blast_index_status = 'building'
+        fasta_db.save()
+        return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def build_mmseqs(self, request, pk=None):
+        fasta_db = self.get_object()
+        if fasta_db.mmseqs_index_status == 'building':
+            return Response({'error': 'MMseqs2 index is already being built'}, status=status.HTTP_400_BAD_REQUEST)
+        build_mmseqs_index.delay(fasta_db.id)
+        fasta_db.mmseqs_index_status = 'building'
+        fasta_db.save()
+        return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
 
 class MultipleSequenceAlignmentViewSet(viewsets.ModelViewSet):
     queryset = MultipleSequenceAlignment.objects.all()

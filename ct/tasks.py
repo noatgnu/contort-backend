@@ -7,8 +7,43 @@ import time
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django_rq import job
-from ct.models import ConsurfJob
+from ct.models import ConsurfJob, ProteinFastaDatabase
 from django.conf import settings
+
+
+@job('default', timeout=3600)
+def build_blast_index(db_id: int):
+    db = ProteinFastaDatabase.objects.get(id=db_id)
+    db.blast_index_status = 'building'
+    db.save()
+    fasta_path = db.fasta_file.path
+    try:
+        result = subprocess.run(
+            ['makeblastdb', '-in', fasta_path, '-dbtype', 'prot', '-out', fasta_path],
+            capture_output=True, text=True
+        )
+        db.blast_index_status = 'ready' if result.returncode == 0 else 'failed'
+    except Exception:
+        db.blast_index_status = 'failed'
+    db.save()
+
+
+@job('default', timeout=3600)
+def build_mmseqs_index(db_id: int):
+    db = ProteinFastaDatabase.objects.get(id=db_id)
+    db.mmseqs_index_status = 'building'
+    db.save()
+    fasta_path = db.fasta_file.path
+    index_path = fasta_path + '_mmseqs'
+    try:
+        result = subprocess.run(
+            ['mmseqs', 'createdb', fasta_path, index_path],
+            capture_output=True, text=True
+        )
+        db.mmseqs_index_status = 'ready' if result.returncode == 0 else 'failed'
+    except Exception:
+        db.mmseqs_index_status = 'failed'
+    db.save()
 
 
 @job('default', timeout=24*60*60)
@@ -50,8 +85,11 @@ def run_consurf_job(job_id: int, session_id: str):
             f.write(consurf_job.query_sequence)
         command.extend(['--seq', query_file])
     if consurf_job.fasta_database:
+        db_path = consurf_job.fasta_database.fasta_file.path
+        if consurf_job.algorithm == 'MMseqs2':
+            db_path = db_path + '_mmseqs'
         command.extend([
-            '--DB', consurf_job.fasta_database.fasta_file.path,
+            '--DB', db_path,
             '--MAX_HOMOLOGS', str(consurf_job.max_homologs),
             '--iterations', str(consurf_job.max_iterations),
             '--MAX_ID', str(consurf_job.max_id),
@@ -73,6 +111,8 @@ def run_consurf_job(job_id: int, session_id: str):
         command.extend(['--structure', consurf_job.structure_file.structure_file.path, '--chain', consurf_job.chain])
     if consurf_job.query_name:
         command.extend(['--query', consurf_job.query_name])
+    if consurf_job.is_nucleotide:
+        command.append('--Nuc')
 
     process = subprocess.Popen(
         command,

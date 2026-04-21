@@ -32,12 +32,16 @@ class CONSURFModel(models.Model):
         super().delete(using=using, keep_parents=keep_parents)
 
 class ProteinFastaDatabase(models.Model):
+    INDEX_STATUS = [('none', 'None'), ('building', 'Building'), ('ready', 'Ready'), ('failed', 'Failed')]
+
     name = models.CharField(max_length=255)
     fasta_file = models.FileField(upload_to="fasta_files")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_public = models.BooleanField(default=False)
     shared_with = models.ManyToManyField(User, related_name='shared_fasta_databases', blank=True)
+    blast_index_status = models.CharField(max_length=20, choices=INDEX_STATUS, default='none')
+    mmseqs_index_status = models.CharField(max_length=20, choices=INDEX_STATUS, default='none')
 
 class MultipleSequenceAlignment(models.Model):
     name = models.CharField(max_length=255)
@@ -85,6 +89,7 @@ class ConsurfJob(models.Model):
     query_name = models.CharField(max_length=255, blank=True, null=True)
     session_id = models.CharField(max_length=255, blank=True, null=True)
     rq_job_id = models.CharField(max_length=255, blank=True, null=True)
+    is_nucleotide = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-id"]
