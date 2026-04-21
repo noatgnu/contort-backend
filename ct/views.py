@@ -254,7 +254,8 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
         fasta_db = self.get_object()
         if fasta_db.blast_index_status == 'building':
             return Response({'error': 'BLAST index is already being built'}, status=status.HTTP_400_BAD_REQUEST)
-        build_blast_index.delay(fasta_db.id)
+        session_id = request.META.get('HTTP_X_CONTORT_SESSION_ID', '')
+        build_blast_index.delay(fasta_db.id, session_id)
         fasta_db.blast_index_status = 'building'
         fasta_db.save()
         return Response(ProteinFastaDatabaseSerializer(fasta_db).data)
@@ -264,7 +265,8 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
         fasta_db = self.get_object()
         if fasta_db.mmseqs_index_status == 'building':
             return Response({'error': 'MMseqs2 index is already being built'}, status=status.HTTP_400_BAD_REQUEST)
-        build_mmseqs_index.delay(fasta_db.id)
+        session_id = request.META.get('HTTP_X_CONTORT_SESSION_ID', '')
+        build_mmseqs_index.delay(fasta_db.id, session_id)
         fasta_db.mmseqs_index_status = 'building'
         fasta_db.save()
         return Response(ProteinFastaDatabaseSerializer(fasta_db).data)

@@ -11,39 +11,72 @@ from ct.models import ConsurfJob, ProteinFastaDatabase
 from django.conf import settings
 
 
+def _send_db_index_ws(session_id: str, db_id: int, index_type: str, status: str, error: str = '') -> None:
+    if not session_id:
+        return
+    channel = get_channel_layer()
+    async_to_sync(channel.group_send)(
+        f'job_{session_id}',
+        {
+            'type': 'job_message',
+            'message': {
+                'type': 'db_index_update',
+                'db_id': db_id,
+                'index_type': index_type,
+                'status': status,
+                'error': error,
+            }
+        }
+    )
+
+
 @job('default', timeout=3600)
-def build_blast_index(db_id: int):
+def build_blast_index(db_id: int, session_id: str = ''):
     db = ProteinFastaDatabase.objects.get(id=db_id)
     db.blast_index_status = 'building'
     db.save()
     fasta_path = db.fasta_file.path
+    error = ''
     try:
         result = subprocess.run(
             ['makeblastdb', '-in', fasta_path, '-dbtype', 'prot', '-out', fasta_path],
             capture_output=True, text=True
         )
-        db.blast_index_status = 'ready' if result.returncode == 0 else 'failed'
-    except Exception:
+        if result.returncode == 0:
+            db.blast_index_status = 'ready'
+        else:
+            db.blast_index_status = 'failed'
+            error = result.stderr.strip() or result.stdout.strip()
+    except Exception as e:
         db.blast_index_status = 'failed'
+        error = str(e)
     db.save()
+    _send_db_index_ws(session_id, db_id, 'blast', db.blast_index_status, error)
 
 
 @job('default', timeout=3600)
-def build_mmseqs_index(db_id: int):
+def build_mmseqs_index(db_id: int, session_id: str = ''):
     db = ProteinFastaDatabase.objects.get(id=db_id)
     db.mmseqs_index_status = 'building'
     db.save()
     fasta_path = db.fasta_file.path
     index_path = fasta_path + '_mmseqs'
+    error = ''
     try:
         result = subprocess.run(
             ['mmseqs', 'createdb', fasta_path, index_path],
             capture_output=True, text=True
         )
-        db.mmseqs_index_status = 'ready' if result.returncode == 0 else 'failed'
-    except Exception:
+        if result.returncode == 0:
+            db.mmseqs_index_status = 'ready'
+        else:
+            db.mmseqs_index_status = 'failed'
+            error = result.stderr.strip() or result.stdout.strip()
+    except Exception as e:
         db.mmseqs_index_status = 'failed'
+        error = str(e)
     db.save()
+    _send_db_index_ws(session_id, db_id, 'mmseqs', db.mmseqs_index_status, error)
 
 
 @job('default', timeout=24*60*60)
