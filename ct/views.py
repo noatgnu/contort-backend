@@ -183,12 +183,14 @@ class ProteinFastaDatabaseViewSet(viewsets.ModelViewSet):
     parser_classes = (MultiPartParser, JSONParser)
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['name']
+    ordering = ['id']
+    ordering_fields = ['id', 'name', 'uploaded_at']
 
     def get_queryset(self):
         user_id = self.request.user.id
         query = Q()
         query &= (Q(user_id=user_id) | Q(is_public=True) | Q(shared_with__id=user_id))
-        return self.queryset.filter(query).distinct()
+        return self.queryset.filter(query).distinct().order_by('id')
 
     def create(self, request, *args, **kwargs):
         upload_id = request.data.get("upload_id")

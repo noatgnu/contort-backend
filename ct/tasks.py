@@ -34,7 +34,7 @@ def _send_db_index_ws(session_id: str, db_id: int, index_type: str, status: str,
 def build_blast_index(db_id: int, session_id: str = ''):
     db = ProteinFastaDatabase.objects.get(id=db_id)
     db.blast_index_status = 'building'
-    db.save()
+    db.save(update_fields=['blast_index_status'])
     fasta_path = db.fasta_file.path
     error = ''
     try:
@@ -50,7 +50,7 @@ def build_blast_index(db_id: int, session_id: str = ''):
     except Exception as e:
         db.blast_index_status = 'failed'
         error = str(e)
-    db.save()
+    db.save(update_fields=['blast_index_status'])
     _send_db_index_ws(session_id, db_id, 'blast', db.blast_index_status, error)
 
 
@@ -58,7 +58,7 @@ def build_blast_index(db_id: int, session_id: str = ''):
 def build_mmseqs_index(db_id: int, session_id: str = ''):
     db = ProteinFastaDatabase.objects.get(id=db_id)
     db.mmseqs_index_status = 'building'
-    db.save()
+    db.save(update_fields=['mmseqs_index_status'])
     fasta_path = db.fasta_file.path
     index_path = fasta_path + '_mmseqs'
     error = ''
@@ -75,7 +75,7 @@ def build_mmseqs_index(db_id: int, session_id: str = ''):
     except Exception as e:
         db.mmseqs_index_status = 'failed'
         error = str(e)
-    db.save()
+    db.save(update_fields=['mmseqs_index_status'])
     _send_db_index_ws(session_id, db_id, 'mmseqs', db.mmseqs_index_status, error)
 
 
