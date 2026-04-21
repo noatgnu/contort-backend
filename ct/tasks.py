@@ -92,7 +92,7 @@ def run_consurf_job(job_id: int, session_id: str):
     stdout_eof = False
     stderr_eof = False
     last_ws_time = 0.0
-    ws_interval = 2.0
+    heartbeat_interval = 5.0
     save_count = 0
     save_interval = 50
 
@@ -123,30 +123,29 @@ def run_consurf_job(job_id: int, session_id: str):
             except BlockingIOError:
                 pass
 
-        if had_data:
-            now = time.time()
-            if now - last_ws_time >= ws_interval:
-                last_ws_time = now
-                consurf_job.log_data = "".join(stdout_chunks)
-                consurf_job.error_data = "".join(stderr_chunks)
-                if save_count >= save_interval:
-                    consurf_job.save()
-                    save_count = 0
-                async_to_sync(channel.group_send)(
-                    f'job_{session_id}',
-                    {
-                        'type': 'job_message',
-                        'message': {
-                            'job_id': job_id,
-                            'status': consurf_job.status,
-                            'session_id': session_id,
-                            'log_data': consurf_job.log_data,
-                            'error_data': consurf_job.error_data,
-                            'message': ""
-                        }
+        now = time.time()
+        if had_data or (now - last_ws_time >= heartbeat_interval):
+            last_ws_time = now
+            consurf_job.log_data = "".join(stdout_chunks)
+            consurf_job.error_data = "".join(stderr_chunks)
+            if save_count >= save_interval:
+                consurf_job.save()
+                save_count = 0
+            async_to_sync(channel.group_send)(
+                f'job_{session_id}',
+                {
+                    'type': 'job_message',
+                    'message': {
+                        'job_id': job_id,
+                        'status': consurf_job.status,
+                        'session_id': session_id,
+                        'log_data': consurf_job.log_data,
+                        'error_data': consurf_job.error_data,
+                        'message': ""
                     }
-                )
-        else:
+                }
+            )
+        elif not had_data:
             time.sleep(0.1)
 
     process.wait()
